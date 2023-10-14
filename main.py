@@ -25,6 +25,16 @@ def send_welcome(message: telebot.types.Message):
 
 @bot.message_handler(content_types=["text"])
 def handle_text(message: telebot.types.Message):
+    template = PromptTemplate.from_template('выяви сущность (товар или услугу), выяви количество, выяви цену'
+                                            'и выяви потратил деньги или заработал пользователь и ответь по такому '
+                                            'шаблону Сущность: (тут сущность которую ты выявил), количество: (тут '
+                                            'количество сущностей), Цена: (тут сумма денег которую потратил или '
+                                            'заработал пользователь), Статус: (тут напиши заработал или потратил) из '
+                                            'следующего сообщения - {text}')
+    prompt = template.format(text=message.text)
+    # Получаем ответ от OpenAI
+    response_text = llm.predict(prompt)
+
     user_message = message.text
     bot.reply_to(message, user_message)
 
