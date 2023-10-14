@@ -31,12 +31,10 @@ def handle_text(message: telebot.types.Message):
                                             'количество сущностей), Цена: (тут сумма денег которую потратил или '
                                             'заработал пользователь), Статус: (тут напиши заработал или потратил) из '
                                             'следующего сообщения - {text}')
-    prompt = template.format(text=message.text)
-    # Получаем ответ от OpenAI
-    response_text = llm.predict(prompt)
 
-    user_message = message.text
-    bot.reply_to(message, user_message)
+    prompt = template.format(text=message.text)
+    response_text = llm.predict(prompt)
+    bot.reply_to(message, response_text)
 
 
 bot.infinity_polling()
