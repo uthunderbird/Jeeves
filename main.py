@@ -18,3 +18,4 @@ def send_welcome(message: telebot.types.Message):
 @bot.message_handler(content_types=["text"])
 def handle_text(message: telebot.types.Message):
     user_message = message.text
+    bot.reply_to(message, user_message)
