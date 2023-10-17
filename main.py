@@ -34,6 +34,16 @@ def send_welcome(message: telebot.types.Message):
     bot.reply_to(message, f"Howdy, how are you doing {message.from_user.first_name}?")
 
 
+@bot.message_handler(commands=['report'])
+def send_json(message: telebot.types.Message):
+    file_path = "database.json"
+    if os.path.exists(file_path):
+        with open(file_path, "rb") as json_file:
+            bot.send_document(message.chat.id, json_file)
+    else:
+        bot.reply_to(message, "JSON файл не найден.")
+
+
 @bot.message_handler(content_types=["text"])
 def handle_text(message: telebot.types.Message):
     global data_list
