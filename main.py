@@ -91,6 +91,7 @@ def answer(call):
             json.dump(data_list, json_file, ensure_ascii=False, indent=4, separators=(',', ': '))
         bot.send_message(call.message.chat.id, 'Новые данные успешно записаны')
     elif call.data == 'no':
+        data_list.pop()
         bot.send_message(call.message.chat.id, 'Данные не записаны')
 
     bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
