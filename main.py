@@ -18,6 +18,7 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
 data_list = []
 
+
 def add_record(entity, quantity, price, status):
     record = {
         "name": entity,
@@ -27,9 +28,11 @@ def add_record(entity, quantity, price, status):
     }
     data_list.append(record)
 
+
 @bot.message_handler(commands=['start'])
 def send_welcome(message: telebot.types.Message):
     bot.reply_to(message, f"Howdy, how are you doing {message.from_user.first_name}?")
+
 
 @bot.message_handler(content_types=["text"])
 def handle_text(message: telebot.types.Message):
@@ -59,9 +62,10 @@ def handle_text(message: telebot.types.Message):
         add_record(entity, quantity, price, status)
 
     file_path = "database.json"
-    with open(file_path, "w") as json_file:
-        json.dump(data_list, json_file, ensure_ascii=False, indent=4)
+    with open(file_path, "w", encoding='utf-8') as json_file:
+        json.dump(data_list, json_file, ensure_ascii=False, indent=4, separators=(',', ': '))
 
     print("Новые данные успешно записаны в файл:", file_path)
+
 
 bot.infinity_polling()
