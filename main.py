@@ -70,18 +70,17 @@ def handle_text(message: telebot.types.Message):
                                             "third is the amount of money gained or spent on this product, "
                                             "fourth is status gained/spent. "
                                             "Your answer should be like this: "
-                                            "Product: (here should be the product or service you identified from the message "
+                                            "Product: (here should be the product you identified from the message "
                                             "or source of money if it was gained) "
                                             "Quantity: (here should be quantity of products or if there is no quantity "
                                             "you should fill 1 in here) "
-                                            "Price: (here should be unit price of a product or service of money mentioned in the message, but "
+                                            "Amount: (here should be amount of money mentioned in the message, but "
                                             "don't mention the currency, only number, it's possible that there will "
                                             "be slang expressions like 'k' referring to number thousand, keep it in "
                                             "mind and save it as a number. For example if there is '2k' or  '2к' it "
                                             "means that your should write 2000) "
                                             "Status: (here should be status you got from the message, whether it was"
                                             "spent or gained, if spent - write 'Expenses', if gained - write 'Income' "
-                                            "Amount: (there should be a sum here, the sum is equal to the quantity multiplied by the price)"
                                             "here is the message from user - {text}")
 
     prompt = template.format(text=message.text)
