@@ -6,25 +6,29 @@ from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from telebot import types
+from datetime import datetime
 
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)
+llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY, temperature=1)
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
 data_list = []
 
 
-def add_record(entity, quantity, price, status):
+def add_record(entity, quantity, price, status, original_message, record_id):
     record = {
+        "record_id": record_id,
+        "original_message": original_message,
         "name": entity,
         "amount": quantity,
         "price": price,
-        "total": status
+        "total": status,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     data_list.append(record)
 
@@ -41,46 +45,61 @@ def send_json(message: telebot.types.Message):
         with open(file_path, "rb") as json_file:
             bot.send_document(message.chat.id, json_file)
     else:
-        bot.reply_to(message, "JSON файл не найден.")
+        bot.reply_to(message, "JSON not found.")
 
 
 @bot.message_handler(content_types=["text"])
 def handle_text(message: telebot.types.Message):
     global data_list
 
-    template = PromptTemplate.from_template('выяви сущность (товар или услугу), выяви количество, выяви цену'
-                                            'и выяви потратил деньги или заработал пользователь и ответь по такому '
-                                            'шаблону Сущность: (тут сущность которую ты выявил), количество: (тут '
-                                            'количество сущностей), Цена: (тут сумма денег которую потратил или '
-                                            'заработал пользователь), Статус: (тут напиши заработал или потратил) из '
-                                            'следующего сообщения - {text}')
+    template = PromptTemplate.from_template("Hello, in the end of this prompt you will get a message, "
+                                            "it's gonna contain text about user's budget. "
+                                            "You should identify 4 parameters in this text: "
+                                            "first is entity (product or service if it's about spending money) "
+                                            "or source if it's about gaining money, "
+                                            "second is the quantity of products, "
+                                            "third is the amount of money gained or spent on this product, "
+                                            "fourth is status gained/spent. "
+                                            "Your answer should be like this: "
+                                            "Product: (here should be the product you identified from the message "
+                                            "or source of money if it was gained) "
+                                            "Quantity: (here should be quantity of products or if there is no quantity "
+                                            "you should fill 1 in here) "
+                                            "Amount: (here should be amount of money mentioned in the message, but "
+                                            "don't mention the currency, only number, it's possible that there will "
+                                            "be slang expressions like 'k' referring to number thousand, keep it in "
+                                            "mind and save it as a number. For example if there is '2k' or  '2к' it "
+                                            "means that your should write 2000) "
+                                            "Status: (here should be status you got from the message, whether it was"
+                                            "spent or gained, if spent - write 'Expenses', if gained - write 'Income' "
+                                            "here is the message from user - {text}")
 
     prompt = template.format(text=message.text)
     response_text = llm.predict(prompt)
     bot.reply_to(message, response_text)
 
-    entity_match = re.search(r'Сущность: (.+)', response_text)
-    quantity_match = re.search(r'Количество: (.+)', response_text)
-    price_match = re.search(r'Цена: (.+)', response_text)
-    status_match = re.search(r'Статус: (.+)', response_text)
+    entity_match = re.search(r'Product: (.+)', response_text)
+    quantity_match = re.search(r'Quantity: (.+)', response_text)
+    price_match = re.search(r'Amount: (.+)', response_text)
+    status_match = re.search(r'Status: (.+)', response_text)
 
     if entity_match and quantity_match and price_match and status_match:
         entity = entity_match.group(1)
         quantity = quantity_match.group(1)
         price = price_match.group(1)
         status = status_match.group(1)
-        add_record(entity, quantity, price, status)
+        add_record(entity, quantity, price, status, message.text, len(data_list) + 1)
 
     send_save_buttons(message.chat.id)
 
 
 def send_save_buttons(chat_id):
     markup_inline = types.InlineKeyboardMarkup()
-    item_yes = types.InlineKeyboardButton(text='Да', callback_data='yes')
-    item_no = types.InlineKeyboardButton(text='Нет', callback_data='no')
+    item_yes = types.InlineKeyboardButton(text='Yes', callback_data='yes')
+    item_no = types.InlineKeyboardButton(text='No', callback_data='no')
 
     markup_inline.add(item_yes, item_no)
-    bot.send_message(chat_id, 'Записать данные?', reply_markup=markup_inline)
+    bot.send_message(chat_id, 'Save data?', reply_markup=markup_inline)
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -89,9 +108,10 @@ def answer(call):
         file_path = "database.json"
         with open(file_path, "w", encoding='utf-8') as json_file:
             json.dump(data_list, json_file, ensure_ascii=False, indent=4, separators=(',', ': '))
-        bot.send_message(call.message.chat.id, 'Новые данные успешно записаны')
+        bot.send_message(call.message.chat.id, 'New data saved successfully')
     elif call.data == 'no':
-        bot.send_message(call.message.chat.id, 'Данные не записаны')
+        data_list.pop()
+        bot.send_message(call.message.chat.id, 'Data not recorded')
 
     bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
     bot.delete_message(call.message.chat.id, call.message.message_id)
