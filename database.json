@@ -1,0 +1,11 @@
+[
+    {
+        "record_id": 1,
+        "original_message": "Купил ноут игровой за 2к бачей",
+        "name": "Ноут игровой",
+        "amount": "2000",
+        "price": "2000",
+        "total": "Expenses",
+        "timestamp": "2023-10-23 16:28:19"
+    }
+]

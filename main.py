@@ -125,11 +125,6 @@ def answer(call):
         bot.send_message(call.message.chat.id, 'New data saved successfully')
     elif call.data == 'no':
         data_list.pop()
-<<<<<<< HEAD
-        bot.send_message(call.message.chat.id, 'Данные не записаны')
-=======
-        bot.send_message(call.message.chat.id, 'Data not recorded')
->>>>>>> Nurbol
 
     bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
     bot.delete_message(call.message.chat.id, call.message.message_id)
