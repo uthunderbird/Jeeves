@@ -13,7 +13,7 @@ load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-llm = ChatOpenAI(model_name="gpt-4-0613", openai_api_key=OPENAI_API_KEY, temperature=1)
+llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
