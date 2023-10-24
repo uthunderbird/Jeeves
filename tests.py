@@ -170,7 +170,6 @@ def handle_text(message: telebot.types.Message):
     # bot.reply_to(message, response_text)
     print(response_text)
 
-    # response_text = str(response_text)
 
     entity_match = re.search(r'🛒 Product: (.+)', response_text)
     # entity_match = response_text['Product']
