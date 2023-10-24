@@ -1,12 +1,12 @@
 [
     {
         "record_id": 1,
-        "original_message": "Сходили с женой в дорогой ресторан на 20000",
-        "name": "дорогой ресторан",
-        "quantity": "1",
-        "price": "20000",
+        "original_message": "купил ford mustang за 20к бачей",
+        "name": "Ford Mustang",
+        "quantity": 1,
+        "price": 20000,
         "total": "Expenses",
-        "amount": "20000",
-        "timestamp": "2023-10-23 19:04:31"
+        "amount": 20000,
+        "timestamp": "2023-10-24 20:28:27"
     }
 ]
