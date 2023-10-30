@@ -15,6 +15,7 @@ from langchain.agents.format_scratchpad import format_to_openai_functions
 from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
 
 from langchain.schema.agent import AgentFinish
+from langchain.agents import AgentExecutor
 
 load_dotenv()
 
@@ -75,8 +76,6 @@ def send_json(message: telebot.types.Message):
 def handle_text(message: telebot.types.Message):
     global data_list
 
-    # input = message.text
-
     prompt = ChatPromptTemplate.from_messages([
         ("system", "Hello, in the end of this prompt you will get a message, "
          "it's gonna contain text about user's budget. "
@@ -112,84 +111,15 @@ def handle_text(message: telebot.types.Message):
                 "agent_scratchpad": lambda x: format_to_openai_functions(x['intermediate_steps'])
             } | prompt | llm_with_tools | OpenAIFunctionsAgentOutputParser()
 
-    intermediate_steps = []
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    agent_executor.invoke({"input": message.text})
+    print(data_list)
+    result_string = ""
+    for item in data_list:
+        for key, value in item.items():
+            result_string += f'{key}: {value}\n'
 
-    while True:
-
-        output = agent.invoke({
-            "input": message.text,
-            "intermediate_steps": []
-        })
-
-        # Проверяем, является ли вывод объектом AgentFinish
-        if isinstance(output, AgentFinish):
-            # Если это завершение агента, получаем окончательный результат и завершаем цикл
-            response_text = output.return_values["output"]
-            break
-        else:
-            # Если это не завершение, печатаем инструмент и его входные данные
-            print(output.tool, output.tool_input)
-
-            # Запускаем соответствующий инструмент и получаем результат
-            tool = {
-                "add_record": add_record
-            }[output.tool]
-            observation = tool.run(output.tool_input)
-
-            # Добавляем текущий вывод и результат инструмента к промежуточным шагам
-            intermediate_steps.append((output, observation))
-
-
-    # template = PromptTemplate.from_template("Hello, in the end of this prompt you will get a message, "
-    #                                         "it's gonna contain text about user's budget. "
-    #                                         "You should identify 4 parameters in this text: "
-    #                                         "first is entity (product or service if it's about spending money) "
-    #                                         "or source if it's about gaining money, "
-    #                                         "second is the quantity of products, "
-    #                                         "third is the amount of money gained or spent on this product, "
-    #                                         "fourth is status gained/spent. "
-    #                                         "Your answer should be like this: "
-    #                                         "Product: (here should be the product or service you identified from the message "
-    #                                         "or source of money if it was gained) "
-    #                                         "Quantity: (here should be quantity of products or if there is no quantity "
-    #                                         "you should fill 1 in here) "
-    #                                         "Price: (here should be unit price of a product or service of money mentioned in the message, but "
-    #                                         "don't mention the currency, only number, it's possible that there will "
-    #                                         "be slang expressions like 'k' referring to number thousand, keep it in "
-    #                                         "mind and save it as a number. For example if there is '2k' or  '2к' it "
-    #                                         "means that your should write 2000) "
-    #                                         "Status: (here should be status you got from the message, whether it was"
-    #                                         "spent or gained, if spent - write 'Expenses', if gained - write 'Income' "
-    #                                         "Amount: (there should be a sum here, the sum is equal to the quantity multiplied by the price)"
-    #                                         "here is the message from user - {text}")
-    #
-    # prompt = template.format(text=message.text)
-    # response_text = llm.predict(prompt)
-    # for param, emoji in emoji_dict.items():
-    #     response_text = response_text.replace(param, f"{emoji} {param}")
-    # bot.reply_to(message, response_text)
-    print(response_text)
-
-
-    entity_match = re.search(r'🛒 Product: (.+)', response_text)
-    # entity_match = response_text['Product']
-    quantity_match = re.search(r'🔢 Quantity: (.+)', response_text)
-    # quantity_match = response_text['Quantity']
-    price_match = re.search(r'💲 Price: (.+)', response_text)
-    # price_match = response_text['Price']
-    status_match = re.search(r'📉 Status: (.+)', response_text)
-    # status_match = response_text['Status']
-    # amount_match = response_text['Amount']
-    amount_match = re.search(r'💰 Amount: (.+)', response_text)
-
-    if entity_match and quantity_match and price_match and status_match and amount_match:
-        entity = entity_match.group(1)
-        quantity = quantity_match.group(1)
-        price = price_match.group(1)
-        status = status_match.group(1)
-        amount = amount_match.group(1)
-        add_record(entity, quantity, price, status, amount, message.text, len(data_list) + 1)
-
+    bot.reply_to(message, result_string)
     send_save_buttons(message.chat.id)
 
 

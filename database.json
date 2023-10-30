@@ -1,12 +1,12 @@
 [
     {
         "record_id": 1,
-        "original_message": "купил ford mustang за 20к бачей",
-        "name": "Ford Mustang",
-        "quantity": 1,
-        "price": 20000,
+        "original_message": "Купил 50 000 долларов на 100 000 тенге",
+        "name": "доллары",
+        "quantity": 50000,
+        "price": 2,
         "total": "Expenses",
-        "amount": 20000,
-        "timestamp": "2023-10-24 20:28:27"
+        "amount": 100000,
+        "timestamp": "2023-10-30 16:38:48"
     }
 ]
