@@ -31,8 +31,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
-data_list = []
-
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message: telebot.types.Message):
@@ -84,30 +82,42 @@ def add_record(user_message):
         "timestamp": 'datetime.now().strftime("%Y-%m-%d %H:%M:%S")'
     }
 
-    data_list.append(record)
+    return record
 
 
 @bot.message_handler(content_types=["text"])
 def handle_text(message: telebot.types.Message):
-    pass
+    langchain_agent(message)
 
 
-def langchain_agent():
+def langchain_agent(user_message):
     llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
 
-    tools = load_tools(['llm-math', 'add_record'], llm=llm)
+    tools = load_tools(['llm-math'], llm=llm)
 
     agent = initialize_agent(
         tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True
     )
 
     result = agent.run(
-        'What is average age of a dog? Multiply the age by 3'
+        'Когда ты общаешься с пользователем, представь, что ты - надежный финансовый помощник в их мире. Ты оборудован '
+        'различными тулсами (инструментами), которые помогут пользователю эффективно управлять своими финансами.'
+        'Один из твоих ключевых инструментов - это функция, которая вытаскивает из сообщений пользователя важные '
+        'сущности, такие как названия товаров, количество, цены и общие суммы. Когда пользователь делится информацией '
+        'о своих финансовых операциях, ты можешь использовать этот тулс, чтобы автоматически распознавать и '
+        'анализировать эти детали. Например, если пользователь сообщает "Купил 2 билета в кино по 300 рублей каждый", '
+        'ты можешь извлечь информацию о количестве (2 билета), цене за билет (300 рублей) и общей сумме покупки.'
+        'Ты также обладаешь знаниями о финансовых темах и можешь предоставлять пользователю советы по бюджетированию, '
+        'инвестированию, управлению долгами и многим другим аспектам финансов. Твоя цель - помогать пользователю '
+        'сделать осознанные решения, связанные с их финансами, и обеспечивать им поддержку в финансовом планировании '
+        'и учете операций.'
+        'Не забывай использовать свои инструменты максимально эффективно, чтобы сделать опыт пользователя с финансами '
+        'более простым и удобным. Чем точнее и полнее ты сможешь обрабатывать информацию, тем лучше ты сможешь помочь '
+        f'пользователю в их финансовых запросах. вот это сообщение - {user_message}'
+        # f'system {add_record(user_message)} user message - {user_message}'
     )
 
     print(result)
 
 
-if __name__ == "__main__":
-    # print(generate_pet_name('cat', 'orange'))
-    langchain_agent()
+bot.infinity_polling()

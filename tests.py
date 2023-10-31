@@ -44,15 +44,18 @@ def add_record(entity, quantity, price, status, amount, original_message, record
     record = {
         "record_id": record_id,
         "original_message": original_message,
-        "name": entity,
+        "product": entity,
         "quantity": quantity,
         "price": price,
         "total": status,
         "amount": amount,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
-    data_list.append(record)
 
+    data_list.clear()
+    print(f'data_list{data_list}')
+    data_list.append(record)
+    print(f'data_list{data_list}')
 
 tools = [add_record]
 
