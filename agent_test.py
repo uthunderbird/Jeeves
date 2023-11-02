@@ -1,3 +1,5 @@
+import typing
+
 import telebot
 import os
 import json
@@ -48,8 +50,10 @@ def send_json(message: telebot.types.Message):
 
 
 @tool
-def add_record(user_message):
-    """system" "Hello, in the end of this prompt you will get a message,
+def add_record(user_message_text):
+    """Useful to transform raw string about financial operations into structured JSON"""
+
+    prompt_template = PromptTemplate.from_template("""system" "Hello, in the end of this prompt you will get a message,
          "it's going contain text about user's budget. "
          "You should identify 4 parameters in this text: "
          "first is entity (product or service if it's about spending money) "
@@ -70,17 +74,12 @@ def add_record(user_message):
          "Status: (here should be status you got from the message, whether it was"
          "spent or gained, if spent - write 'Expenses', if gained - write 'Income' "
          "Amount: (there should be a sum here, the sum is equal to the quantity multiplied by the price)
-         user message - {user_message}"""
-    record = {
-        "record_id": 'record_id',
-        "original_message": 'original_message',
-        "name": 'entity',
-        "quantity": 'quantity',
-        "price": 'price',
-        "total": 'status',
-        "amount": 'amount',
-        "timestamp": 'datetime.now().strftime("%Y-%m-%d %H:%M:%S")'
-    }
+         user message - {user_message}""")
+    prompt = prompt_template.format(user_message=user_message_text)
+
+    llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
+
+    record = llm.predict(prompt)
 
     return record
 
@@ -96,7 +95,7 @@ def langchain_agent(user_message):
     tools = load_tools(['llm-math'], llm=llm)
 
     agent = initialize_agent(
-        tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True
+        tools + [add_record], llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True
     )
 
     result = agent.run(

@@ -1,12 +1,12 @@
 [
     {
         "record_id": 1,
-        "original_message": "Купил 50 000 долларов на 100 000 тенге",
-        "name": "доллары",
-        "quantity": 50000,
-        "price": 2,
+        "original_message": "купил вина на 20к",
+        "name": "вино",
+        "quantity": "1",
+        "price": "20000",
         "total": "Expenses",
-        "amount": 100000,
-        "timestamp": "2023-10-30 16:38:48"
+        "amount": "20000",
+        "timestamp": "2023-11-01 18:58:04"
     }
 ]
