@@ -1,12 +1,7 @@
-[
-    {
-        "record_id": 1,
-        "original_message": "купил вина на 20к",
-        "name": "вино",
-        "quantity": "1",
-        "price": "20000",
-        "total": "Expenses",
-        "amount": "20000",
-        "timestamp": "2023-11-01 18:58:04"
-    }
-]
+{
+    "Product": "машина",
+    "Quantity": 1,
+    "Price": 200000,
+    "Status": "Income",
+    "Amount": 200000
+}

@@ -24,6 +24,8 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.agents import load_tools, initialize_agent, AgentType
 
+from langchain.callbacks import HumanApprovalCallbackHandler
+
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -50,7 +52,7 @@ def send_json(message: telebot.types.Message):
 
 
 @tool
-def add_record(user_message_text):
+def create_record(user_message_text) -> str:
     """Useful to transform raw string about financial operations into structured JSON"""
 
     prompt_template = PromptTemplate.from_template("""system" "Hello, in the end of this prompt you will get a message,
@@ -74,6 +76,7 @@ def add_record(user_message_text):
          "Status: (here should be status you got from the message, whether it was"
          "spent or gained, if spent - write 'Expenses', if gained - write 'Income' "
          "Amount: (there should be a sum here, the sum is equal to the quantity multiplied by the price)
+         "Return it in dict format
          user message - {user_message}""")
     prompt = prompt_template.format(user_message=user_message_text)
 
@@ -81,7 +84,53 @@ def add_record(user_message_text):
 
     record = llm.predict(prompt)
 
+    # dict_record = json.loads(record)
+
+    # print(f'Eto dict_record!{dict_record}')
+    # print(type(dict_record))
+    #
+    # print(f'Eto record{record}')
+    # print(type(record))
+
     return record
+
+
+# @tool
+# def show_formal_message(formal_message: str, message):
+#     """useful for reply to the user message in Telegram bot the result of the create_record tool, for further confirmation by the user of
+#     the correct operation."""
+#     bot.reply_to(message, formal_message)
+#
+#     return 'message showed successfully'
+
+
+@tool
+def save_record(formal_message):
+    """Useful to save structured JSON record into JSON file"""
+
+    # prompt_template = PromptTemplate.from_template("""system" "Сохрани элементы, которые ты получил от агента
+    #  в JSON файл в формате (ключ: значение).
+    #  user message - {formal_message}""")
+    # prompt = prompt_template.format(formal_message=formal_message)
+    #
+    # llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
+
+    # record = llm.predict(prompt)
+
+    # dict_record = json.loads(formal_message)
+    file_path = "database.json"
+    with open(file_path, "w", encoding='utf-8') as json_file:
+        json.dump(formal_message, json_file, ensure_ascii=False, indent=4, separators=(',', ': '))
+
+    # dict_record = json.loads(record)
+
+    # print(f'Eto dict_record!{dict_record}')
+    # print(type(dict_record))
+    #
+    # print(f'Eto record{record}')
+    # print(type(record))
+    #
+    return 'structured JSON record saved successfully'
 
 
 @bot.message_handler(content_types=["text"])
@@ -95,7 +144,9 @@ def langchain_agent(user_message):
     tools = load_tools(['llm-math'], llm=llm)
 
     agent = initialize_agent(
-        tools + [add_record], llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True
+        tools + [create_record, save_record], llm,
+        agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=True
     )
 
     result = agent.run(
@@ -112,10 +163,11 @@ def langchain_agent(user_message):
         'и учете операций.'
         'Не забывай использовать свои инструменты максимально эффективно, чтобы сделать опыт пользователя с финансами '
         'более простым и удобным. Чем точнее и полнее ты сможешь обрабатывать информацию, тем лучше ты сможешь помочь '
-        f'пользователю в их финансовых запросах. вот это сообщение - {user_message}'
+        f'пользователю в их финансовых запросах. вот это сообщение - {user_message.text}'
         # f'system {add_record(user_message)} user message - {user_message}'
     )
 
+    bot.reply_to(user_message, result)
     print(result)
 
 
