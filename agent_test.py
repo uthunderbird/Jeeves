@@ -108,29 +108,24 @@ def create_record(user_message_text) -> str:
 def save_record(formal_message):
     """Useful to save structured JSON record into JSON file"""
 
-    # prompt_template = PromptTemplate.from_template("""system" "Сохрани элементы, которые ты получил от агента
-    #  в JSON файл в формате (ключ: значение).
-    #  user message - {formal_message}""")
-    # prompt = prompt_template.format(formal_message=formal_message)
-    #
-    # llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
-
-    # record = llm.predict(prompt)
-
-    # dict_record = json.loads(formal_message)
     file_path = "database.json"
+
+    # Пытаемся загрузить существующие данные из файла
+    try:
+        with open(file_path, "r", encoding='utf-8') as json_file:
+            data = json.load(json_file)
+    except FileNotFoundError:
+        # Если файл не существует, создаем пустой список
+        data = []
+
+    # Добавляем новую запись в список
+    data.append(formal_message)
+
+    # Записываем обновленный список в файл
     with open(file_path, "w", encoding='utf-8') as json_file:
-        json.dump(formal_message, json_file, ensure_ascii=False, indent=4, separators=(',', ': '))
+        json.dump(data, json_file, ensure_ascii=False, indent=4, separators=(',', ': '))
 
-    # dict_record = json.loads(record)
-
-    # print(f'Eto dict_record!{dict_record}')
-    # print(type(dict_record))
-    #
-    # print(f'Eto record{record}')
-    # print(type(record))
-    #
-    return 'structured JSON record saved successfully'
+    return 'Structured JSON record saved successfully'
 
 
 @bot.message_handler(content_types=["text"])
@@ -163,12 +158,36 @@ def langchain_agent(user_message):
         'и учете операций.'
         'Не забывай использовать свои инструменты максимально эффективно, чтобы сделать опыт пользователя с финансами '
         'более простым и удобным. Чем точнее и полнее ты сможешь обрабатывать информацию, тем лучше ты сможешь помочь '
-        f'пользователю в их финансовых запросах. вот это сообщение - {user_message.text}'
+        # 'получив ответ от тулса create_record тебе следует выслать это сообщение пользователю на проверку вот такой '
+        # 'командой - {bot.reply_to(user_message, record}'
+        f'пользователю в их финансовых запросах. вот это сообщение - {user_message.text}',
+        callbacks=callbacks
         # f'system {add_record(user_message)} user message - {user_message}'
     )
 
     bot.reply_to(user_message, result)
     print(result)
+
+
+def _should_check(serialized_obj: dict) -> bool:
+    # Only require approval on ShellTool.
+    return serialized_obj.get("name") == "save_record"
+
+
+def _approve(_input: str) -> bool:
+    if '"action": "save_record",' in _input:
+        return True
+    msg = (
+        "Do you approve of the following input? "
+        "Anything except 'Y'/'Yes' (case-insensitive) will be treated as a no."
+    )
+    # bot.reply_to(user_message, msg)
+    msg += "\n\n" + _input + "\n"
+    resp = input(msg)
+    return resp.lower() in ("yes", "y")
+
+
+callbacks = [HumanApprovalCallbackHandler(should_check=_should_check, approve=_approve)]
 
 
 bot.infinity_polling()
