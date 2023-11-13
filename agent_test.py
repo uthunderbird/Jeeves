@@ -1,3 +1,4 @@
+import functools
 import typing
 
 import telebot
@@ -10,6 +11,7 @@ from langchain.prompts import PromptTemplate
 from telebot import types
 from datetime import datetime
 from langchain.agents import tool
+from langchain.agents import Tool
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.tools.render import format_tool_to_openai_function
 
@@ -84,24 +86,16 @@ def create_record(user_message_text) -> str:
 
     record = llm.predict(prompt)
 
-    # dict_record = json.loads(record)
-
-    # print(f'Eto dict_record!{dict_record}')
-    # print(type(dict_record))
-    #
-    # print(f'Eto record{record}')
-    # print(type(record))
-
     return record
 
 
-# @tool
-# def show_formal_message(formal_message: str, message):
-#     """useful for reply to the user message in Telegram bot the result of the create_record tool, for further confirmation by the user of
-#     the correct operation."""
-#     bot.reply_to(message, formal_message)
-#
-#     return 'message showed successfully'
+def show_formal_message(formal_message: str, user_message):
+    """useful for reply to the user message in Telegram bot the result of the create_record tool or for validation,
+    for further confirmation by the user of the correct operation. You need to use this tool immediately after
+    create_record tool and before save_record tool """
+    bot.reply_to(user_message, formal_message)
+
+    return 'message showed successfully'
 
 
 @tool
@@ -133,13 +127,25 @@ def handle_text(message: telebot.types.Message):
     langchain_agent(message)
 
 
-def langchain_agent(user_message):
+def langchain_agent(user_message: telebot.types.Message):
     llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
 
     tools = load_tools(['llm-math'], llm=llm)
 
+    callbacks = [HumanApprovalCallbackHandler(should_check=_should_check,
+                                              approve=functools.partial(_approve,
+                                                                        user_message=user_message))]
+    # callbacks = [HumanApprovalCallbackHandler(should_check=_should_check, approve=_approve)]
+
     agent = initialize_agent(
-        tools + [create_record, save_record], llm,
+        tools + [create_record,
+                 save_record,
+                 Tool.from_function(functools.partial(show_formal_message, user_message=user_message),
+                                    'show_formal_message',
+                                    """useful for reply to the user message in Telegram bot the result of the 
+                                    create_record tool or for validation, for further confirmation by the user of the 
+                                    correct operation. You need to use this tool immediately after
+                                    create_record tool and before save_record tool """)], llm,
         agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
         verbose=True
     )
@@ -169,25 +175,46 @@ def langchain_agent(user_message):
     print(result)
 
 
+def send_save_buttons(chat_id):
+    markup_inline = types.InlineKeyboardMarkup()
+    item_yes = types.InlineKeyboardButton(text='Yes', callback_data='yes')
+    item_no = types.InlineKeyboardButton(text='No', callback_data='no')
+
+    markup_inline.add(item_yes, item_no)
+    bot.send_message(chat_id, 'Save data?', reply_markup=markup_inline)
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def answer(call):
+    if call.data == 'yes':
+        bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                      reply_markup=None)
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        return True
+    elif call.data == 'no':
+        return False
+
+
 def _should_check(serialized_obj: dict) -> bool:
-    # Only require approval on ShellTool.
     return serialized_obj.get("name") == "save_record"
 
 
-def _approve(_input: str) -> bool:
-    if '"action": "save_record",' in _input:
-        return True
+def _approve(_input: str, user_message) -> bool:
+    print(f'ETO INPUT {_input}')
+    print(type(_input))
+    print(f'ETO USER_MESSAGE {user_message}')
+    print(type(user_message))
+    # if 'formal_message' in _input:
+    #     return True
     msg = (
         "Do you approve of the following input? "
         "Anything except 'Y'/'Yes' (case-insensitive) will be treated as a no."
     )
-    # bot.reply_to(user_message, msg)
     msg += "\n\n" + _input + "\n"
+    bot.reply_to(user_message, msg)
+    send_save_buttons(user_message.chat.id)
     resp = input(msg)
     return resp.lower() in ("yes", "y")
-
-
-callbacks = [HumanApprovalCallbackHandler(should_check=_should_check, approve=_approve)]
 
 
 bot.infinity_polling()

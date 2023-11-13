@@ -1,16 +1,12 @@
 [
     {
-        "Product": "тачка",
-        "Quantity": 1,
-        "Price": 20000000,
-        "Status": "Expenses",
-        "Amount": 20000000
-    },
-    {
-        "Product": "тачка",
-        "Quantity": 1,
-        "Price": 35000000,
-        "Status": "Income",
-        "Amount": 35000000
+        "record_id": 1,
+        "original_message": "Купил сидор 1.5 литра за 2000тг",
+        "name": "Сидор ",
+        "quantity": "1.5 ",
+        "price": "2000 ",
+        "total": "Expenses ",
+        "amount": "3000",
+        "timestamp": "2023-11-10 22:14:48"
     }
 ]
