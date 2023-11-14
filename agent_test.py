@@ -133,9 +133,7 @@ def langchain_agent(user_message: telebot.types.Message):
     tools = load_tools(['llm-math'], llm=llm)
 
     callbacks = [HumanApprovalCallbackHandler(should_check=_should_check,
-                                              approve=functools.partial(_approve,
-                                                                        user_message=user_message))]
-    # callbacks = [HumanApprovalCallbackHandler(should_check=_should_check, approve=_approve)]
+                                              approve=functools.partial(_approve, user_message=user_message))]
 
     agent = initialize_agent(
         tools + [create_record,
@@ -168,7 +166,6 @@ def langchain_agent(user_message: telebot.types.Message):
         # 'командой - {bot.reply_to(user_message, record}'
         f'пользователю в их финансовых запросах. вот это сообщение - {user_message.text}',
         callbacks=callbacks
-        # f'system {add_record(user_message)} user message - {user_message}'
     )
 
     bot.reply_to(user_message, result)
@@ -214,6 +211,8 @@ def _approve(_input: str, user_message) -> bool:
     bot.reply_to(user_message, msg)
     send_save_buttons(user_message.chat.id)
     resp = input(msg)
+    trueResp = answer()
+    print(trueResp)
     return resp.lower() in ("yes", "y")
 
 
