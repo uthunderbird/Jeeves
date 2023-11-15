@@ -57,6 +57,7 @@ class WorkSpace:
     def __init__(self, bot):
         self.bot = bot
         self.record = ''
+        self.answerCall = True
 
     def langchain_agent(self, user_message: telebot.types.Message):
         llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
@@ -79,7 +80,7 @@ class WorkSpace:
                 #                         create_record tool or for validation, for further confirmation by the user of
                 #                         the correct operation. You need to use this tool immediately after
                 #                         create_record tool and before save_record tool"""),
-                Tool.from_function(functools.partial(self.save_record, formal_message=self.record),
+                Tool.from_function(functools.partial(self.save_record),
                                    'save_record',
                                    """Useful to save structured JSON record into JSON file""")], llm,
             agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
@@ -106,7 +107,7 @@ class WorkSpace:
         self.bot.reply_to(user_message, result)
         print(result)
 
-    def create_record(self, user_message_text) -> str:
+    def create_record(self, user_message_text):
         """Useful to transform raw string about financial operations into structured JSON"""
 
         prompt_template = PromptTemplate.from_template("""system" "Hello, in the end of this prompt you will get a message,
@@ -136,13 +137,26 @@ class WorkSpace:
         prompt = prompt_template.format(user_message=user_message_text)
         llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
         record = llm.predict(prompt)
+
+
+        record = json.loads(record)
         self.record = record
+        print(f'ETO SELF REC {self.record}')
+        print(f'ETO REC {record}')
+        print(type(self.record))
+        print(type(record))
         return record
 
-    @staticmethod
-    def save_record(formal_message: str):
+    # def save_record(self, product, qty, price, status, total):
+    def save_record(self, record: dict) -> str:
         """Useful to save structured JSON record into JSON file"""
+        print(f'ETO SELF RECORD{self.record}')
+        print(type(self.record))
+        print(f'ETO RECORD{record}')
+        print(type(record))
+        # print(f'ARGS {args}')
 
+        # print(f'ETO ARGS{product}, qty {qty}, price {price}, status {status}, total {total}')
         file_path = "database.json"
 
         # Пытаемся загрузить существующие данные из файла
@@ -154,7 +168,7 @@ class WorkSpace:
             data = []
 
         # Добавляем новую запись в список
-        data.append(formal_message)
+        # data.append(formal_message)
 
         # Записываем обновленный список в файл
         with open(file_path, "w", encoding='utf-8') as json_file:
@@ -184,8 +198,10 @@ class WorkSpace:
             self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                                reply_markup=None)
             self.bot.delete_message(call.message.chat.id, call.message.message_id)
+            self.answerCall = True
             return True
         elif call.data == 'no':
+            self.answerCall = False
             return False
 
     @staticmethod
@@ -206,9 +222,9 @@ class WorkSpace:
         msg += "\n\n" + _input + "\n"
         self.bot.reply_to(user_message, msg)
         self.send_save_buttons(user_message.chat.id)
-        resp = self.answer()
+        # resp = self.answer()
         # return resp.lower() in ("yes", "y")
-        return resp
+        return self.answerCall
 
 
 # class CallbackQueryHandler:
