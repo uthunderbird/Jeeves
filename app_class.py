@@ -6,6 +6,8 @@ import os
 import json
 from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
+from langchain.tools import StructuredTool
+from pydantic.v1 import BaseModel, Field
 from telebot import types
 from langchain.agents import Tool
 from langchain.prompts import PromptTemplate
@@ -54,13 +56,23 @@ class SendJson:
 
 
 class WorkSpace:
+
+    class SaveRecordSchema(BaseModel):
+        product: str = Field(description='entity')
+        price: int = Field(description='price')
+        quantity: int = Field(description='quantity')
+        status: str = Field(description='status')
+        amount: int = Field(description='amount')
+
+    class CreateRecordSchema(BaseModel):
+        user_message_text: str = Field(description='user input text')
     def __init__(self, bot):
         self.bot = bot
-        self.record = ''
+        self.record = {}
         self.answerCall = True
 
     def langchain_agent(self, user_message: telebot.types.Message):
-        llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
+        llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
 
         tools = load_tools(['llm-math'], llm=llm)
 
@@ -70,19 +82,26 @@ class WorkSpace:
 
         agent = initialize_agent(
             tools + [
-                Tool.from_function(functools.partial(self.create_record),
-                                   'create_record',
-                                   """Useful to transform raw string about financial operations 
-                                        into structured JSON"""),
+                # self.save_record,
+                StructuredTool.from_function(
+                    func=self.create_record,
+                    name='create_record',
+                    description="""Useful to transform raw string about financial operations into structured JSON""",
+                    args_schema=self.CreateRecordSchema,
+                ),
                 # Tool.from_function(functools.partial(self.show_formal_message, user_message=user_message),
                 #                    'show_formal_message',
                 #                    """useful for reply to the user message in Telegram bot the result of the
                 #                         create_record tool or for validation, for further confirmation by the user of
                 #                         the correct operation. You need to use this tool immediately after
                 #                         create_record tool and before save_record tool"""),
-                Tool.from_function(functools.partial(self.save_record),
-                                   'save_record',
-                                   """Useful to save structured JSON record into JSON file""")], llm,
+                StructuredTool.from_function(
+                    func=self.save_record,
+                    name='save_record',
+                    description="""Useful to save structured dict record into JSON file""",
+                    args_schema=self.SaveRecordSchema,
+                )
+        ], llm,
             agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
             verbose=True
         )
@@ -94,7 +113,7 @@ class WorkSpace:
             'сущности, такие как названия товаров, количество, цены и общие суммы. Когда пользователь делится информацией '
             'о своих финансовых операциях, ты можешь использовать этот тулс, чтобы автоматически распознавать и '
             'анализировать эти детали. Например, если пользователь сообщает "Купил 2 билета в кино по 300 рублей каждый", '
-            'ты можешь извлечь информацию о количестве (2 билета), цене за билет (300 рублей) и общей сумме покупки.'
+            'ты можешь извлечь информацию о количестве (2 билета), цена за билет (300 рублей) и общей сумме покупки.'
             'Ты также обладаешь знаниями о финансовых темах и можешь предоставлять пользователю советы по бюджетированию, '
             'инвестированию, управлению долгами и многим другим аспектам финансов. Твоя цель - помогать пользователю '
             'сделать осознанные решения, связанные с их финансами, и обеспечивать им поддержку в финансовом планировании '
@@ -131,30 +150,38 @@ class WorkSpace:
              "Status: (here should be status you got from the message, whether it was"
              "spent or gained, if spent - write 'Expenses', if gained - write 'Income' "
              "Amount: (there should be a sum here, the sum is equal to the quantity multiplied by the price)
-             "Return it in dict format
              user message - {user_message}""")
 
         prompt = prompt_template.format(user_message=user_message_text)
         llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
         record = llm.predict(prompt)
 
-
-        record = json.loads(record)
+        # record = json.loads(record)
         self.record = record
         print(f'ETO SELF REC {self.record}')
         print(f'ETO REC {record}')
         print(type(self.record))
         print(type(record))
-        return record
+        return json.dumps(self.record)
 
     # def save_record(self, product, qty, price, status, total):
-    def save_record(self, record: dict) -> str:
-        """Useful to save structured JSON record into JSON file"""
+    def save_record(
+        self,
+        product: str,
+        price: int,
+        quantity: int,
+        status: str,
+        amount: int,
+    ) -> str:
+        """Useful to save record in string format into JSON file"""
         print(f'ETO SELF RECORD{self.record}')
         print(type(self.record))
-        print(f'ETO RECORD{record}')
-        print(type(record))
-        # print(f'ARGS {args}')
+        # print(f'ETO RECORD{record}')
+        # print(type(record))
+        # print(f'ARGS {args}'
+        print(product)
+        print(price)
+        print(quantity)
 
         # print(f'ETO ARGS{product}, qty {qty}, price {price}, status {status}, total {total}')
         file_path = "database.json"
@@ -175,14 +202,6 @@ class WorkSpace:
             json.dump(data, json_file, ensure_ascii=False, indent=4, separators=(',', ': '))
 
         return 'Structured JSON record saved successfully'
-
-    def show_formal_message(self, formal_message: str, user_message):
-        """useful for reply to the user message in Telegram bot the result of the create_record tool or for validation,
-        for further confirmation by the user of the correct operation. You need to use this tool immediately after
-        create_record tool and before save_record tool """
-        self.bot.reply_to(user_message, formal_message)
-
-        return 'message showed successfully'
 
     def send_save_buttons(self, chat_id):
         markup_inline = types.InlineKeyboardMarkup()
@@ -208,7 +227,7 @@ class WorkSpace:
     def _should_check(serialized_obj: dict) -> bool:
         return serialized_obj.get("name") == "save_record"
 
-    def _approve(self, _input: str, user_message) -> bool:
+    def _approve(self, _input: dict, user_message) -> bool:
         print(f'ETO INPUT {_input}')
         print(type(_input))
         print(f'ETO USER_MESSAGE {user_message}')
@@ -219,7 +238,7 @@ class WorkSpace:
             "Do you approve of the following input? "
             "Anything except 'Y'/'Yes' (case-insensitive) will be treated as a no."
         )
-        msg += "\n\n" + _input + "\n"
+        msg += _input
         self.bot.reply_to(user_message, msg)
         self.send_save_buttons(user_message.chat.id)
         # resp = self.answer()
@@ -259,3 +278,12 @@ class WorkSpace:
 #         CallbackQueryHandler.send_save_buttons(user_message.chat.id)
 #         resp = input(msg)
 #         return resp.lower() in ("yes", "y")
+
+
+    # def show_formal_message(self, formal_message: str, user_message):
+    #     """useful for reply to the user message in Telegram bot the result of the create_record tool or for validation,
+    #     for further confirmation by the user of the correct operation. You need to use this tool immediately after
+    #     create_record tool and before save_record tool """
+    #     self.bot.reply_to(user_message, formal_message)
+    #
+    #     return 'message showed successfully'
