@@ -1,0 +1,114 @@
+[
+    {
+        "product": "Кола",
+        "price": 500,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 500
+    },
+    {
+        "product": "дом",
+        "price": 1000000,
+        "quantity": 1,
+        "status": "Income",
+        "amount": 1000000
+    },
+    {
+        "product": "Кола",
+        "price": 500,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 500
+    },
+    {
+        "product": "Кола",
+        "price": 1000,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 1000
+    },
+    {
+        "product": "Cola",
+        "price": 500,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 500
+    },
+    {
+        "product": "Кола",
+        "price": 500,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 500
+    },
+    {
+        "product": "Кола",
+        "price": 500,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 500
+    },
+    {
+        "product": "Cola",
+        "price": 500,
+        "quantity": 1,
+        "status": "expense",
+        "amount": 500
+    },
+    {
+        "product": "Cola",
+        "price": 500,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 500
+    },
+    {
+        "product": "Кола",
+        "price": 500,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 500
+    },
+    {
+        "product": "Cola",
+        "price": 500,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 500
+    },
+    {
+        "product": "Кола",
+        "price": 500,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 500
+    },
+    {
+        "product": "Cola",
+        "price": 500,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 500
+    },
+    {
+        "product": "Кола",
+        "price": 500,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 500
+    },
+    {
+        "product": "Дом",
+        "price": 1000000,
+        "quantity": 1,
+        "status": "Income",
+        "amount": 1000000
+    },
+    {
+        "product": "дом",
+        "price": 1000,
+        "quantity": 1,
+        "status": "Expenses",
+        "amount": 1000
+    }
+]

@@ -1,25 +1,48 @@
-from aiogram import types, F, Router
-from aiogram.types import Message
-from aiogram.filters import Command
-from aiogram.enums.parse_mode import ParseMode
+import asyncio
+import logging
+
+from aiogram.types import CallbackQuery, Message
+from aiogram.filters import Command, CommandStart
 from main import HandleText, SendJson
-import config
+from config import dp, bot, router
+from main import WorkSpace
 
-router = config.router
 
-
-@router.message(Command("start"))
+@dp.message(CommandStart())
 async def send_welcome(msg: Message):
-    await msg.answer(f"Howdy, how are you doing {msg.from_user.first_name}?")
+    await msg.reply(f"Howdy, how are you doing {msg.from_user.first_name}?")
 
 
-@router.message(Command("text"))
+@dp.message()
 async def handle_text(msg: Message):
-    commands_handler = HandleText(config.bot)
-    await commands_handler.handle_text(msg)
+    commands_handler = HandleText(bot)
+    response_message = await commands_handler.handle_text(msg)
+    await msg.reply(response_message.text, reply_markup=WorkSpace(bot).markup_inline)
 
 
-@router.message(Command("report"))
+@dp.message(Command("report"))
 async def send_welcome(msg: Message):
-    commands_handler = SendJson(config.bot)
+    commands_handler = SendJson(bot)
     await commands_handler.send_json(msg)
+
+
+@dp.callback_query(lambda c: c.data == 'yes')
+async def handle_yes(callback: CallbackQuery):
+    user_message = callback.message
+    await user_message.edit_text('Data saved!')
+
+
+@dp.callback_query(lambda c: c.data == 'no')
+async def handle_no(callback: CallbackQuery):
+    user_message = callback.message
+    await user_message.edit_text('Data not saved!')
+
+
+async def main(dp, bot):
+    dp.include_router(router)
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    asyncio.get_event_loop().run_until_complete(main(dp, bot))

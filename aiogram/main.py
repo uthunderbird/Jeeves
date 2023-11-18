@@ -1,8 +1,6 @@
 import asyncio
 import logging
-
-import config
-import handlers
+from config import bot, dp, router, OPENAI_API_KEY, TELEGRAM_TOKEN
 import functools
 import os
 import json
@@ -12,12 +10,8 @@ from langchain.tools import StructuredTool
 from pydantic.v1 import BaseModel, Field
 from langchain.prompts import PromptTemplate
 from langchain.agents import load_tools, initialize_agent, AgentType
-
 from langchain.callbacks import HumanApprovalCallbackHandler
-
-bot = config.bot
-dp = config.dp
-router = config.router
+from aiogram import types, Bot, Dispatcher
 
 
 class HandleText:
@@ -58,9 +52,10 @@ class WorkSpace:
         self.bot = bot
         self.record = {}
         self.answerCall = True
+        self.markup_inline = None
 
     async def langchain_agent(self, user_message: Message):
-        llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=config.OPENAI_API_KEY, temperature=0.8, verbose=True)
+        llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
 
         tools = load_tools(['llm-math'], llm=llm)
 
@@ -94,7 +89,7 @@ class WorkSpace:
             verbose=True
         )
 
-        result = await agent.run(
+        result = agent.run(
             'Когда ты общаешься с пользователем, представь, что ты - надежный финансовый помощник в их мире. Ты оборудован '
             'различными тулсами (инструментами), которые помогут пользователю эффективно управлять своими финансами.'
             'Один из твоих ключевых инструментов - это функция, которая вытаскивает из сообщений пользователя важные '
@@ -111,7 +106,11 @@ class WorkSpace:
             f'пользователю в их финансовых запросах. вот это сообщение - {user_message.text}',
             callbacks=callbacks
         )
-        await self.bot.send_message(user_message, result)
+        if await self._approve(result, user_message):
+            await self.bot.send_message(user_message.chat.id, 'Data will be saved.')
+        else:
+            await self.bot.send_message(user_message.chat.id, 'Data will not be saved.')
+
         print(result)
 
     def create_record(self, user_message_text):
@@ -141,7 +140,7 @@ class WorkSpace:
              user message - {user_message}""")
 
         prompt = prompt_template.format(user_message=user_message_text)
-        llm = ChatOpenAI(model_name="gpt-4", openai_api_key=config.OPENAI_API_KEY, temperature=0.8)
+        llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
         record = llm.predict(prompt)
 
         # record = json.loads(record)
@@ -162,28 +161,30 @@ class WorkSpace:
         amount: int,
     ) -> str:
         """Useful to save record in string format into JSON file"""
-        print(f'ETO SELF RECORD{self.record}')
-        print(type(self.record))
-        # print(f'ETO RECORD{record}')
-        # print(type(record))
-        # print(f'ARGS {args}'
-        print(product)
-        print(price)
-        print(quantity)
 
-        # print(f'ETO ARGS{product}, qty {qty}, price {price}, status {status}, total {total}')
         file_path = "database.json"
+
+        # Проверяем наличие файла и создаем его, если он не существует
+        if not os.path.exists(file_path):
+            with open(file_path, "w", encoding='utf-8') as json_file:
+                json.dump([], json_file, ensure_ascii=False, indent=4, separators=(',', ': '))
 
         # Пытаемся загрузить существующие данные из файла
         try:
             with open(file_path, "r", encoding='utf-8') as json_file:
                 data = json.load(json_file)
-        except FileNotFoundError:
-            # Если файл не существует, создаем пустой список
+        except json.decoder.JSONDecodeError:
+            # Если файл пуст или содержит некорректный JSON, создаем пустой список
             data = []
 
         # Добавляем новую запись в список
-        # data.append(formal_message)
+        data.append({
+            "product": product,
+            "price": price,
+            "quantity": quantity,
+            "status": status,
+            "amount": amount,
+        })
 
         # Записываем обновленный список в файл
         with open(file_path, "w", encoding='utf-8') as json_file:
@@ -191,54 +192,40 @@ class WorkSpace:
 
         return 'Structured JSON record saved successfully'
 
-    # def send_save_buttons(self, chat_id):
-    #     markup_inline = types.InlineKeyboardMarkup()
-    #     item_yes = types.InlineKeyboardButton(text='Yes', callback_data='yes')
-    #     item_no = types.InlineKeyboardButton(text='No', callback_data='no')
-    #
-    #     markup_inline.add(item_yes, item_no)
-    #     self.bot.send_message(chat_id, 'Save data?', reply_markup=markup_inline)
+    async def send_with_inline_keyboard(self, chat_id):
+        item_save = types.InlineKeyboardButton(text='Yes', callback_data='yes')
+        item_cancel = types.InlineKeyboardButton(text='No', callback_data='no')
+        self.markup_inline = types.InlineKeyboardMarkup(row_width=2, inline_keyboard=[[item_cancel], [item_save]])
 
-    # @bot.callback_query_handler(func=lambda call: True)
-    # def answer(self, call):
-    #     if call.data == 'yes':
-    #         self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
-    #                                            reply_markup=None)
-    #         self.bot.delete_message(call.message.chat.id, call.message.message_id)
-    #         self.answerCall = True
-    #         return True
-    #     elif call.data == 'no':
-    #         self.answerCall = False
-    #         return False
+        msg = (
+            "Do you want to save the following data? "
+            "Type 'Yes' to confirm or 'No' to cancel."
+        )
+        await self.bot.send_message(chat_id, msg, reply_markup=self.markup_inline)
 
     @staticmethod
     def _should_check(serialized_obj: dict) -> bool:
         return serialized_obj.get("name") == "save_record"
 
-    def _approve(self, _input: dict, user_message) -> bool:
+    async def _approve(self, _input: dict, user_message: Message) -> bool:
         print(f'ETO INPUT {_input}')
         print(type(_input))
         print(f'ETO USER_MESSAGE {user_message}')
         print(type(user_message))
-        # if 'formal_message' in _input:
-        #     return True
-        msg = (
-            "Do you approve of the following input? "
-            "Anything except 'Y'/'Yes' (case-insensitive) will be treated as a no."
-        )
-        msg += _input
-        self.bot.send_message(user_message, msg)
-        # self.send_save_buttons(user_message.chat.id)
-        # resp = self.answer()
-        # return resp.lower() in ("yes", "y")
+
+        # msg = (
+        #     "Do you want to save the following data? "
+        #     "Type 'Yes' to confirm or 'No' to cancel."
+        # )
+        # await self.bot.send_message(user_message.chat.id, msg)
+
+        await self.send_with_inline_keyboard(user_message.chat.id)
+
+        response = await self.bot.wait_for(types.CallbackQuery, timeout=30)
+        if response.data == 'yes':
+            self.answerCall = True
+        else:
+            self.answerCall = False
+
         return self.answerCall
 
-
-async def main(dp, bot):
-    dp.include_router(router)
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    asyncio.get_event_loop().run_until_complete(main(dp, bot))
