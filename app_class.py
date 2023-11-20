@@ -4,6 +4,7 @@ import typing
 import telebot
 import os
 import json
+from models import Session, FinancialRecord
 from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.tools import StructuredTool
@@ -165,41 +166,20 @@ class WorkSpace:
         return json.dumps(self.record)
 
     # def save_record(self, product, qty, price, status, total):
-    def save_record(
-        self,
-        product: str,
-        price: int,
-        quantity: int,
-        status: str,
-        amount: int,
-    ) -> str:
-        """Useful to save record in string format into JSON file"""
-        print(f'ETO SELF RECORD{self.record}')
-        print(type(self.record))
-        # print(f'ETO RECORD{record}')
-        # print(type(record))
-        # print(f'ARGS {args}'
-        print(product)
-        print(price)
-        print(quantity)
+    def save_record(self, product, price, quantity, status, amount):
+        session = Session()
 
-        # print(f'ETO ARGS{product}, qty {qty}, price {price}, status {status}, total {total}')
-        file_path = "database.json"
+        financial_record = FinancialRecord(
+            product=product,
+            quantity=quantity,
+            status=status,
+            amount=amount
+        )
 
-        # Пытаемся загрузить существующие данные из файла
-        try:
-            with open(file_path, "r", encoding='utf-8') as json_file:
-                data = json.load(json_file)
-        except FileNotFoundError:
-            # Если файл не существует, создаем пустой список
-            data = []
+        session.add(financial_record)
+        session.commit()
 
-        # Добавляем новую запись в список
-        # data.append(formal_message)
-
-        # Записываем обновленный список в файл
-        with open(file_path, "w", encoding='utf-8') as json_file:
-            json.dump(data, json_file, ensure_ascii=False, indent=4, separators=(',', ': '))
+        session.close()
 
         return 'Structured JSON record saved successfully'
 
