@@ -1,6 +1,6 @@
 import functools
 import typing
-
+import ast
 import telebot
 import os
 import json
@@ -167,19 +167,6 @@ class WorkSpace:
 
     # def save_record(self, product, qty, price, status, total):
     def save_record(self, product, price, quantity, status, amount):
-        session = Session()
-
-        financial_record = FinancialRecord(
-            product=product,
-            quantity=quantity,
-            status=status,
-            amount=amount
-        )
-
-        session.add(financial_record)
-        session.commit()
-
-        session.close()
 
         return 'Structured JSON record saved successfully'
 
@@ -207,11 +194,37 @@ class WorkSpace:
     def _should_check(serialized_obj: dict) -> bool:
         return serialized_obj.get("name") == "save_record"
 
-    def _approve(self, _input: dict, user_message) -> bool:
+    def _approve(self, _input: str, user_message) -> bool:
         print(f'ETO INPUT {_input}')
         print(type(_input))
         print(f'ETO USER_MESSAGE {user_message}')
         print(type(user_message))
+
+        data_dict = ast.literal_eval(_input)
+        print(f'ETO INPUT DICT: {data_dict}')
+        print(type(data_dict))
+        
+        session = Session()
+
+        financial_record = FinancialRecord(
+            user_id=user_message.from_user.id,
+            username=user_message.from_user.username,
+            user_message=user_message.text,
+            product=data_dict.get("product"),
+            price=data_dict.get("price"),
+            quantity=data_dict.get("quantity"),
+            status=data_dict.get("status"),
+            amount=data_dict.get("amount")
+        )
+
+        session.add(financial_record)
+        session.commit()
+
+        session.close()
+
+        #user_message.from_user.id
+        #user_message.from_user.username
+        #user_message.text
         # if 'formal_message' in _input:
         #     return True
         msg = (
