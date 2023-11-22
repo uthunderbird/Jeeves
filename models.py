@@ -17,7 +17,7 @@ Base = declarative_base()
 class FinancialRecord(Base):
     __tablename__ = 'financial_records'
 
-    record_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
+    message_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
     user_id = Column(Integer)
     username = Column(String)
     user_message = Column(String)
@@ -26,7 +26,7 @@ class FinancialRecord(Base):
     quantity = Column(Integer)
     status = Column(String)
     amount = Column(Integer)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    timestamp = Column(String, default=datetime.datetime.utcnow().strftime('%d-%m-%y %H:%M'))
 
 engine = create_engine(DATABASE_URL, echo=True)
 Base.metadata.create_all(bind=engine)

@@ -179,7 +179,7 @@ class WorkSpace:
         self.bot.send_message(chat_id, 'Save data?', reply_markup=markup_inline)
 
     @bot.callback_query_handler(func=lambda call: True)
-    def answer(self, call):
+    async def answer(self, call):
         if call.data == 'yes':
             self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                                reply_markup=None)
