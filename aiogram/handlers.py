@@ -3,9 +3,12 @@ import logging
 
 from aiogram.types import CallbackQuery, Message
 from aiogram.filters import Command, CommandStart
-from main import HandleText, SendJson
-from config import dp, bot, router
+from main import HandleText
+from config import dp, bot, router, llm
 from main import WorkSpace
+from langchain.chat_models import ChatOpenAI
+from config import OPENAI_API_KEY
+from aiogram import F
 
 
 @dp.message(CommandStart())
@@ -16,23 +19,24 @@ async def send_welcome(msg: Message):
 @dp.message()
 async def handle_text(msg: Message):
     commands_handler = HandleText(bot)
-    response_message = await commands_handler.handle_text(msg)
-    await msg.reply(response_message.text, reply_markup=WorkSpace(bot).markup_inline)
+    await commands_handler.handle_text(msg)
 
 
-@dp.message(Command("report"))
-async def send_welcome(msg: Message):
-    commands_handler = SendJson(bot)
-    await commands_handler.send_json(msg)
+# @dp.message(Command("report"))
+# async def send_welcome(msg: Message):
+#     commands_handler = SendJson(bot)
+#     await commands_handler.send_json(msg)
 
 
-@dp.callback_query(lambda c: c.data == 'yes')
+@dp.callback_query(F.data == "yes")
 async def handle_yes(callback: CallbackQuery):
     user_message = callback.message
+    workspace = WorkSpace(bot)
+    workspace.save_record(user_message)
     await user_message.edit_text('Data saved!')
 
 
-@dp.callback_query(lambda c: c.data == 'no')
+@dp.callback_query(F.data == "no")
 async def handle_no(callback: CallbackQuery):
     user_message = callback.message
     await user_message.edit_text('Data not saved!')

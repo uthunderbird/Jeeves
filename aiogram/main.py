@@ -1,43 +1,27 @@
+import ast
 import asyncio
-import logging
-from config import bot, dp, router, OPENAI_API_KEY, TELEGRAM_TOKEN
 import functools
-import os
-import json
 from aiogram.types import Message
-from langchain.chat_models import ChatOpenAI
 from langchain.tools import StructuredTool
 from pydantic.v1 import BaseModel, Field
 from langchain.prompts import PromptTemplate
 from langchain.agents import load_tools, initialize_agent, AgentType
 from langchain.callbacks import HumanApprovalCallbackHandler
-from aiogram import types, Bot, Dispatcher
+from aiogram import types
+from models import Session, FinancialRecord
+from config import llm, dp
 
 
 class HandleText:
     def __init__(self, bot):
         self.bot = bot
+        self.workspace = WorkSpace(bot)
 
     async def handle_text(self, message: Message):
-        agent = WorkSpace(bot=self.bot)
-        await agent.langchain_agent(user_message=message)
-
-
-class SendJson:
-    def __init__(self, bot):
-        self.bot = bot
-
-    async def send_json(self, message: Message):
-        file_path = "database.json"
-        if os.path.exists(file_path):
-            with open(file_path, "rb") as json_file:
-                await self.bot.send_document(message.chat.id, json_file)
-        else:
-            await self.bot.send_message(message, "JSON not found.")
+        return await self.workspace.langchain_agent(user_message=message)
 
 
 class WorkSpace:
-
     class SaveRecordSchema(BaseModel):
         product: str = Field(description='entity')
         price: int = Field(description='price')
@@ -50,14 +34,14 @@ class WorkSpace:
 
     def __init__(self, bot):
         self.bot = bot
-        self.record = {}
-        self.answerCall = True
+        self.record = ''
+        self.response_data = {}
+        self.llm = llm
         self.markup_inline = None
+        self.keyboard = None
 
     async def langchain_agent(self, user_message: Message):
-        llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
-
-        tools = load_tools(['llm-math'], llm=llm)
+        tools = load_tools(['llm-math'], llm=self.llm)
 
         callbacks = [HumanApprovalCallbackHandler(should_check=self._should_check,
                                                   approve=functools.partial(self._approve,
@@ -65,26 +49,13 @@ class WorkSpace:
 
         agent = initialize_agent(
             tools + [
-                # self.save_record,
                 StructuredTool.from_function(
                     func=self.create_record,
                     name='create_record',
-                    description="""Useful to transform raw string about financial operations into structured JSON""",
+                    description="""Useful to transform raw string about financial operations into structured dictionary""",
                     args_schema=self.CreateRecordSchema,
                 ),
-                # Tool.from_function(functools.partial(self.show_formal_message, user_message=user_message),
-                #                    'show_formal_message',
-                #                    """useful for reply to the user message in Telegram bot the result of the
-                #                         create_record tool or for validation, for further confirmation by the user of
-                #                         the correct operation. You need to use this tool immediately after
-                #                         create_record tool and before save_record tool"""),
-                StructuredTool.from_function(
-                    func=self.save_record,
-                    name='save_record',
-                    description="""Useful to save structured dict record into JSON file""",
-                    args_schema=self.SaveRecordSchema,
-                )
-        ], llm,
+            ], self.llm,
             agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
             verbose=True
         )
@@ -106,16 +77,12 @@ class WorkSpace:
             f'пользователю в их финансовых запросах. вот это сообщение - {user_message.text}',
             callbacks=callbacks
         )
-        if await self._approve(result, user_message):
-            await self.bot.send_message(user_message.chat.id, 'Data will be saved.')
-        else:
-            await self.bot.send_message(user_message.chat.id, 'Data will not be saved.')
 
-        print(result)
+        await self._approve(_input=result, user_message=user_message)
+
+        return result
 
     def create_record(self, user_message_text):
-        """Useful to transform raw string about financial operations into structured JSON"""
-
         prompt_template = PromptTemplate.from_template("""system" "Hello, in the end of this prompt you will get a message,
              "it's going contain text about user's budget. "
              "You should identify 4 parameters in this text: "
@@ -140,92 +107,77 @@ class WorkSpace:
              user message - {user_message}""")
 
         prompt = prompt_template.format(user_message=user_message_text)
-        llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
         record = llm.predict(prompt)
-
-        # record = json.loads(record)
         self.record = record
-        print(f'ETO SELF REC {self.record}')
-        print(f'ETO REC {record}')
-        print(type(self.record))
-        print(type(record))
-        return json.dumps(self.record)
 
-    # def save_record(self, product, qty, price, status, total):
-    def save_record(
-        self,
-        product: str,
-        price: int,
-        quantity: int,
-        status: str,
-        amount: int,
-    ) -> str:
-        """Useful to save record in string format into JSON file"""
+        record_lines = record.split('\n')
+        record_dict = {}
 
-        file_path = "database.json"
+        for line in record_lines:
+            key, value = map(str.strip, line.split(':'))
+            record_dict[key] = value
 
-        # Проверяем наличие файла и создаем его, если он не существует
-        if not os.path.exists(file_path):
-            with open(file_path, "w", encoding='utf-8') as json_file:
-                json.dump([], json_file, ensure_ascii=False, indent=4, separators=(',', ': '))
+        if record_dict:
+            self.response_data = {
+                "Product": record_dict.get('Product', ''),
+                "Quantity": record_dict.get('Quantity', ''),
+                "Price": record_dict.get('Price', ''),
+                "Status": record_dict.get('Status', ''),
+                "Amount": record_dict.get('Amount', '')
+            }
 
-        # Пытаемся загрузить существующие данные из файла
-        try:
-            with open(file_path, "r", encoding='utf-8') as json_file:
-                data = json.load(json_file)
-        except json.decoder.JSONDecodeError:
-            # Если файл пуст или содержит некорректный JSON, создаем пустой список
-            data = []
+        return self.response_data
 
-        # Добавляем новую запись в список
-        data.append({
-            "product": product,
-            "price": price,
-            "quantity": quantity,
-            "status": status,
-            "amount": amount,
-        })
+    def save_record(self, user_message) -> str:
 
-        # Записываем обновленный список в файл
-        with open(file_path, "w", encoding='utf-8') as json_file:
-            json.dump(data, json_file, ensure_ascii=False, indent=4, separators=(',', ': '))
+        if self.response_data:
+            session = Session()
 
-        return 'Structured JSON record saved successfully'
+            try:
+                financial_record = FinancialRecord(
+                    user_id=user_message.from_user.id,
+                    username=user_message.from_user.username,
+                    user_message=user_message.text,
+                    product=self.response_data.get("product"),
+                    price=self.response_data.get("price"),
+                    quantity=self.response_data.get("quantity"),
+                    status=self.response_data.get("status"),
+                    amount=self.response_data.get("amount")
+                )
 
-    async def send_with_inline_keyboard(self, chat_id):
-        item_save = types.InlineKeyboardButton(text='Yes', callback_data='yes')
-        item_cancel = types.InlineKeyboardButton(text='No', callback_data='no')
-        self.markup_inline = types.InlineKeyboardMarkup(row_width=2, inline_keyboard=[[item_cancel], [item_save]])
+                session.add(financial_record)
+                session.commit()
+            except Exception as e:
+                print(f"Error while saving financial record: {e}")
+                session.rollback()
+            finally:
+                session.close()
 
-        msg = (
-            "Do you want to save the following data? "
-            "Type 'Yes' to confirm or 'No' to cancel."
-        )
-        await self.bot.send_message(chat_id, msg, reply_markup=self.markup_inline)
+            return 'Structured record saved successfully'
+
+    def send_with_inline_keyboard(self):
+        buttons = [
+            [
+                types.InlineKeyboardButton(text="Yes", callback_data="yes"),
+                types.InlineKeyboardButton(text="No", callback_data="no")
+            ],
+        ]
+        self.keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
+        return "Do you want to save the following data? Type 'Yes' to confirm or 'No' to cancel.", self.keyboard
 
     @staticmethod
     def _should_check(serialized_obj: dict) -> bool:
         return serialized_obj.get("name") == "save_record"
 
-    async def _approve(self, _input: dict, user_message: Message) -> bool:
+    async def _approve(self, _input: str, user_message):
         print(f'ETO INPUT {_input}')
         print(type(_input))
         print(f'ETO USER_MESSAGE {user_message}')
         print(type(user_message))
 
-        # msg = (
-        #     "Do you want to save the following data? "
-        #     "Type 'Yes' to confirm or 'No' to cancel."
-        # )
-        # await self.bot.send_message(user_message.chat.id, msg)
+        text, keyboard = self.send_with_inline_keyboard()
+        await user_message.reply(text=self.record)
+        await user_message.answer(text=text, reply_markup=keyboard)
 
-        await self.send_with_inline_keyboard(user_message.chat.id)
 
-        response = await self.bot.wait_for(types.CallbackQuery, timeout=30)
-        if response.data == 'yes':
-            self.answerCall = True
-        else:
-            self.answerCall = False
-
-        return self.answerCall
 
