@@ -28,7 +28,7 @@ class FinancialRecord(Base):
     amount = Column(Integer)
     timestamp = Column(String, default=datetime.datetime.utcnow().strftime('%d-%m-%y %H:%M'))
 
-engine = create_engine(DATABASE_URL, echo=True)
-Base.metadata.create_all(bind=engine)
+# engine = create_engine(DATABASE_URL, echo=True)
+# Base.metadata.create_all(bind=engine)
 
-Session = sessionmaker(bind=engine)
+# Session = sessionmaker(bind=engine)

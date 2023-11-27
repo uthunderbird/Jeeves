@@ -1,20 +1,23 @@
-import telebot
+import asyncio
+
+import telebot.async_telebot
 import os
 from dotenv import load_dotenv
 from app_class import SendWelcome, HandleText, SendJson
-from report_generator import PDFGenerator
+# from report_generator import PDFGenerator
 
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
+bot = telebot.async_telebot.AsyncTeleBot(TELEGRAM_TOKEN)
 
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     commands_handler = SendWelcome(bot)
     commands_handler.send_welcome(message)
+
 
 @bot.message_handler(commands=['report'])
 def send_report(message):
@@ -29,9 +32,11 @@ def send_report(message):
     else:
         bot.reply_to(message, "Unable to generate the report.")
 
+
 @bot.message_handler(content_types=["text"])
 def handle_text(message: telebot.types.Message):
     commands_handler = HandleText(bot)
     commands_handler.handle_text(message)
 
-bot.infinity_polling()
+
+asyncio.run(bot.polling())

@@ -1,10 +1,18 @@
+import asyncio
 import functools
 import typing
 import ast
-import telebot
+from asyncio import Event
+from uuid import UUID
+
+import telebot.async_telebot
 import os
 import json
-from models import Session, FinancialRecord
+
+from langchain.callbacks.base import AsyncCallbackHandler
+from langchain.callbacks.human import HumanRejectedException
+
+# from models import Session, FinancialRecord
 from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.tools import StructuredTool
@@ -20,10 +28,6 @@ load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-load_dotenv()
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
-
 
 class SendWelcome:
     def __init__(self, bot):
@@ -37,9 +41,8 @@ class HandleText:
     def __init__(self, bot):
         self.bot = bot
 
-    @staticmethod
-    def handle_text(message: telebot.types.Message):
-        agent = WorkSpace(bot=bot)
+    def handle_text(self, message: telebot.types.Message):
+        agent = WorkSpace(bot=self.bot)
         agent.langchain_agent(user_message=message)
 
 
@@ -56,6 +59,34 @@ class SendJson:
             self.bot.reply_to(message, "JSON not found.")
 
 
+class HumanApprovalCallbackHandler(AsyncCallbackHandler):
+    """Callback for manually validating values."""
+
+    raise_error: bool = True
+
+    def __init__(
+        self,
+        approve,
+        should_check: typing.Callable[[typing.Dict[str, typing.Any]], bool],
+    ):
+        self._approve = approve
+        self._should_check = should_check
+
+    async def on_tool_start(
+        self,
+        serialized: typing.Dict[str, typing.Any],
+        input_str: str,
+        *,
+        run_id: UUID,
+        parent_run_id: typing.Optional[UUID] = None,
+        **kwargs: typing.Any,
+    ) -> typing.Any:
+        if self._should_check(serialized) and not await self._approve(input_str):
+            raise HumanRejectedException(
+                f"Inputs {input_str} to tool {serialized} were rejected."
+            )
+
+
 class WorkSpace:
 
     class SaveRecordSchema(BaseModel):
@@ -67,10 +98,13 @@ class WorkSpace:
 
     class CreateRecordSchema(BaseModel):
         user_message_text: str = Field(description='user input text')
+
     def __init__(self, bot):
         self.bot = bot
         self.record = {}
         self.answerCall = True
+        self._answer_recieved = Event()
+        self.build_answer_callback()
 
     def langchain_agent(self, user_message: telebot.types.Message):
         llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
@@ -107,7 +141,9 @@ class WorkSpace:
             verbose=True
         )
 
-        result = agent.run(
+        loop = asyncio.get_running_loop()
+
+        result = loop.create_task(agent.arun(
             'Когда ты общаешься с пользователем, представь, что ты - надежный финансовый помощник в их мире. Ты оборудован '
             'различными тулсами (инструментами), которые помогут пользователю эффективно управлять своими финансами.'
             'Один из твоих ключевых инструментов - это функция, которая вытаскивает из сообщений пользователя важные '
@@ -123,8 +159,8 @@ class WorkSpace:
             'более простым и удобным. Чем точнее и полнее ты сможешь обрабатывать информацию, тем лучше ты сможешь помочь '
             f'пользователю в их финансовых запросах. вот это сообщение - {user_message.text}',
             callbacks=callbacks
-        )
-        self.bot.reply_to(user_message, result)
+        ))
+        loop.create_task(self.bot.reply_to(user_message, result))
         print(result)
 
     def create_record(self, user_message_text):
@@ -170,70 +206,82 @@ class WorkSpace:
 
         return 'Structured JSON record saved successfully'
 
-    def send_save_buttons(self, chat_id):
+    async def send_save_buttons(self, chat_id):
         markup_inline = types.InlineKeyboardMarkup()
         item_yes = types.InlineKeyboardButton(text='Yes', callback_data='yes')
         item_no = types.InlineKeyboardButton(text='No', callback_data='no')
 
         markup_inline.add(item_yes, item_no)
-        self.bot.send_message(chat_id, 'Save data?', reply_markup=markup_inline)
+        await self.bot.send_message(chat_id, 'Save data?', reply_markup=markup_inline)
 
-    @bot.callback_query_handler(func=lambda call: True)
-    async def answer(self, call):
-        if call.data == 'yes':
-            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                               reply_markup=None)
-            self.bot.delete_message(call.message.chat.id, call.message.message_id)
-            self.answerCall = True
-            return True
-        elif call.data == 'no':
-            self.answerCall = False
-            return False
+    def build_answer_callback(self):
+        @self.bot.callback_query_handler(func=lambda call: True)
+        async def answer(call):
+            print("ANSWER")
+            if call.data == 'yes':
+                print('YES')
+                await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                                   reply_markup=None)
+                await self.bot.delete_message(call.message.chat.id, call.message.message_id)
+                self.answerCall = True
+            elif call.data == 'no':
+                print('NO')
+                await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id,
+                                                         message_id=call.message.message_id,
+                                                         reply_markup=None)
+                await self.bot.delete_message(call.message.chat.id, call.message.message_id)
+                self.answerCall = False
+            self._answer_recieved.set()
+            return self.answerCall
 
     @staticmethod
     def _should_check(serialized_obj: dict) -> bool:
         return serialized_obj.get("name") == "save_record"
 
-    def _approve(self, _input: str, user_message) -> bool:
+    async def _approve(self, _input: str, user_message) -> bool:
         print(f'ETO INPUT {_input}')
         print(type(_input))
         print(f'ETO USER_MESSAGE {user_message}')
         print(type(user_message))
 
+        msg = (
+            "Do you approve of the following input? "
+            "Anything except 'Y'/'Yes' (case-insensitive) will be treated as a no."
+        )
+        msg += _input
+        await self.bot.reply_to(user_message, msg)
+        await self.send_save_buttons(user_message.chat.id)
+
+        await self._answer_recieved.wait()
+
         data_dict = ast.literal_eval(_input)
         print(f'ETO INPUT DICT: {data_dict}')
         print(type(data_dict))
         
-        session = Session()
-
-        financial_record = FinancialRecord(
-            user_id=user_message.from_user.id,
-            username=user_message.from_user.username,
-            user_message=user_message.text,
-            product=data_dict.get("product"),
-            price=data_dict.get("price"),
-            quantity=data_dict.get("quantity"),
-            status=data_dict.get("status"),
-            amount=data_dict.get("amount")
-        )
-
-        session.add(financial_record)
-        session.commit()
-
-        session.close()
+        # session = Session()
+        #
+        # financial_record = FinancialRecord(
+        #     user_id=user_message.from_user.id,
+        #     username=user_message.from_user.username,
+        #     user_message=user_message.text,
+        #     product=data_dict.get("product"),
+        #     price=data_dict.get("price"),
+        #     quantity=data_dict.get("quantity"),
+        #     status=data_dict.get("status"),
+        #     amount=data_dict.get("amount")
+        # )
+        #
+        # session.add(financial_record)
+        # session.commit()
+        #
+        # session.close()
 
         #user_message.from_user.id
         #user_message.from_user.username
         #user_message.text
         # if 'formal_message' in _input:
         #     return True
-        msg = (
-            "Do you approve of the following input? "
-            "Anything except 'Y'/'Yes' (case-insensitive) will be treated as a no."
-        )
-        msg += _input
-        self.bot.reply_to(user_message, msg)
-        self.send_save_buttons(user_message.chat.id)
+
         # resp = self.answer()
         # return resp.lower() in ("yes", "y")
         return self.answerCall
