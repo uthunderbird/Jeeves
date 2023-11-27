@@ -12,7 +12,7 @@ import json
 from langchain.callbacks.base import AsyncCallbackHandler
 from langchain.callbacks.human import HumanRejectedException
 
-# from models import Session, FinancialRecord
+from models import Session, FinancialRecord
 from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.tools import StructuredTool
@@ -258,32 +258,32 @@ class WorkSpace:
         print(f'ETO INPUT DICT: {data_dict}')
         print(type(data_dict))
         
-        # session = Session()
-        #
-        # financial_record = FinancialRecord(
-        #     user_id=user_message.from_user.id,
-        #     username=user_message.from_user.username,
-        #     user_message=user_message.text,
-        #     product=data_dict.get("product"),
-        #     price=data_dict.get("price"),
-        #     quantity=data_dict.get("quantity"),
-        #     status=data_dict.get("status"),
-        #     amount=data_dict.get("amount")
-        # )
-        #
-        # session.add(financial_record)
-        # session.commit()
-        #
-        # session.close()
+        if self.answerCall is True:
+            session = Session()
 
-        #user_message.from_user.id
-        #user_message.from_user.username
-        #user_message.text
-        # if 'formal_message' in _input:
-        #     return True
+            financial_record = FinancialRecord(
+                user_id=user_message.from_user.id,
+                username=user_message.from_user.username,
+                user_message=user_message.text,
+                product=data_dict.get("product"),
+                price=data_dict.get("price"),
+                quantity=data_dict.get("quantity"),
+                status=data_dict.get("status"),
+                amount=data_dict.get("amount")
+            )
 
-        # resp = self.answer()
-        # return resp.lower() in ("yes", "y")
+            session.add(financial_record)
+            session.commit()
+
+            session.close()
+
+            user_message.from_user.id
+            user_message.from_user.username
+            user_message.text
+
+        elif self.answerCall is False: 
+            print('FINISH YOPTA')
+
         return self.answerCall
 
 
@@ -328,3 +328,4 @@ class WorkSpace:
     #     self.bot.reply_to(user_message, formal_message)
     #
     #     return 'message showed successfully'
+

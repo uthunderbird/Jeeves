@@ -3,8 +3,8 @@ import asyncio
 import telebot.async_telebot
 import os
 from dotenv import load_dotenv
-from app_class import SendWelcome, HandleText, SendJson
-# from report_generator import PDFGenerator
+from app_class_1 import SendWelcome, HandleText, SendJson
+from report_generator import PDFGenerator
 
 load_dotenv()
 
@@ -40,3 +40,4 @@ def handle_text(message: telebot.types.Message):
 
 
 asyncio.run(bot.polling())
+
