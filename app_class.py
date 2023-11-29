@@ -157,7 +157,9 @@ class WorkSpace:
             'и учете операций.'
             'Не забывай использовать свои инструменты максимально эффективно, чтобы сделать опыт пользователя с финансами '
             'более простым и удобным. Чем точнее и полнее ты сможешь обрабатывать информацию, тем лучше ты сможешь помочь '
-            f'пользователю в их финансовых запросах. вот это сообщение - {user_message.text}',
+            f'пользователю в их финансовых запросах. вот это сообщение - {user_message.text}.'
+            f'Если ты получаешь дополнительное сообщение от клиента об изменениях в текущей записи, то используй '
+            f'clarifyingQuestion tool и передай туда это сообщение {user_message.text} под названием new_user_message',
             callbacks=callbacks
         ))
         loop.create_task(self.bot.reply_to(user_message, result))
@@ -285,6 +287,19 @@ class WorkSpace:
             print('FINISH YOPTA')
 
         return self.answerCall
+
+    def clarifying_question(self, record, new_user_message):
+        """Useful to clarify the reason why data should not be saved, when user chose 'no' in save_record tool and
+        what changes should be implemented in formal_message in save_record tool"""
+
+        prompt_template = PromptTemplate.from_template(f"""system" Here you get {record}. You should ask user what
+        was wrong in it and what part of it should be changed, you get this info from {new_user_message}, after this
+        you need to rewrite the record and send it back to agent""")
+
+        llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
+        new_record = llm.predict(prompt_template)
+
+        return new_record
 
 
 # class CallbackQueryHandler:

@@ -121,14 +121,6 @@ def save_record(formal_message):
 
     return 'Structured JSON record saved successfully'
 
-@tool
-def clarifying_question(user_message_original, user_message_specified):
-    """Useful to clarify the reason why data should not be saved, when user chose 'no' in save_record tool and
-    what changes should be implemented in formal_message in save_record tool"""
-
-    prompt_template = PromptTemplate.from_template()
-
-
 @bot.message_handler(content_types=["text"])
 def handle_text(message: telebot.types.Message):
     langchain_agent(message)
