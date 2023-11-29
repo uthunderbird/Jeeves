@@ -135,7 +135,14 @@ class WorkSpace:
                     name='save_record',
                     description="""Useful to save structured dict record into JSON file""",
                     args_schema=self.SaveRecordSchema,
-                )
+                ),
+                StructuredTool.from_function(
+                    func=self.clarifying_question,
+                    name='clarifying_question',
+                    description="""Useful to clarify the reason why data should not be saved, when user chose 'no' 
+                    in save_record tool and what changes should be implemented in formal_message in save_record tool""",
+                    args_schema=self.SaveRecordSchema,
+                ),
         ], llm,
             agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
             verbose=True
