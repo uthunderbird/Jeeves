@@ -42,8 +42,8 @@ class HandleText:
         self.bot = bot
 
     def handle_text(self, message: telebot.types.Message):
-        agent = WorkSpace(bot=self.bot)
-        agent.langchain_agent(user_message=message)
+        agent = MessageProcessor(bot=self.bot, user_message=message)
+        agent.process()
 
 
 class SendJson:
@@ -87,7 +87,7 @@ class HumanApprovalCallbackHandler(AsyncCallbackHandler):
             )
 
 
-class WorkSpace:
+class MessageProcessor:
 
     class SaveRecordSchema(BaseModel):
         product: str = Field(description='entity')
@@ -99,21 +99,21 @@ class WorkSpace:
     class CreateRecordSchema(BaseModel):
         user_message_text: str = Field(description='user input text')
 
-    def __init__(self, bot):
+    def __init__(self, bot, user_message):
         self.bot = bot
         self.record = {}
         self.answerCall = True
         self._answer_recieved = Event()
         self.build_answer_callback()
+        self.user_message = user_message
 
-    def langchain_agent(self, user_message: telebot.types.Message):
+    def process(self):
         llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
 
         tools = load_tools(['llm-math'], llm=llm)
 
         callbacks = [HumanApprovalCallbackHandler(should_check=self._should_check,
-                                                  approve=functools.partial(self._approve,
-                                                                            user_message=user_message))]
+                                                  approve=self._approve)]
 
         agent = initialize_agent(
             tools + [
@@ -136,13 +136,13 @@ class WorkSpace:
                     description="""Useful to save structured dict record into JSON file""",
                     args_schema=self.SaveRecordSchema,
                 ),
-                StructuredTool.from_function(
-                    func=self.clarifying_question,
-                    name='clarifying_question',
-                    description="""Useful to clarify the reason why data should not be saved, when user chose 'no' 
-                    in save_record tool and what changes should be implemented in formal_message in save_record tool""",
-                    args_schema=self.SaveRecordSchema,
-                ),
+                # StructuredTool.from_function(
+                #     func=self.clarifying_question,
+                #     name='clarifying_question',
+                #     description="""Useful to clarify the reason why data should not be saved, when user chose 'no' 
+                #     in save_record tool and what changes should be implemented in formal_message in save_record tool""",
+                #     args_schema=self.SaveRecordSchema,
+                # ),
         ], llm,
             agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
             verbose=True
@@ -164,15 +164,15 @@ class WorkSpace:
             'и учете операций.'
             'Не забывай использовать свои инструменты максимально эффективно, чтобы сделать опыт пользователя с финансами '
             'более простым и удобным. Чем точнее и полнее ты сможешь обрабатывать информацию, тем лучше ты сможешь помочь '
-            f'пользователю в их финансовых запросах. вот это сообщение - {user_message.text}.'
-            f'Если ты получаешь дополнительное сообщение от клиента об изменениях в текущей записи, то используй '
-            f'clarifyingQuestion tool и передай туда это сообщение {user_message.text} под названием new_user_message',
+            f'пользователю в их финансовых запросах. вот это сообщение - {self.user_message.text}.',
+            #f'Если ты получаешь дополнительное сообщение от клиента об изменениях в текущей записи, то используй '
+            #f'clarifyingQuestion tool и передай туда это сообщение {self.user_message.text} под названием new_user_message',
             callbacks=callbacks
         ))
-        loop.create_task(self.bot.reply_to(user_message, result))
+        loop.create_task(self.bot.reply_to(self.user_message, result))
         print(result)
 
-    def create_record(self, user_message_text):
+    def create_record(self, *args, **kwargs):
         """Useful to transform raw string about financial operations into structured JSON"""
 
         prompt_template = PromptTemplate.from_template("""system" "Hello, in the end of this prompt you will get a message,
@@ -195,10 +195,10 @@ class WorkSpace:
              "means that you should write 2000 "
              "Status: (here should be status you got from the message, whether it was"
              "spent or gained, if spent - write 'Expenses', if gained - write 'Income' "
-             "Amount: (there should be a sum here, the sum is equal to the quantity multiplied by the price)
-             user message - {user_message}""")
+             "Amount: (there should be a sum here, the sum is equal to the quantity multiplied by the price),
+             'user message - {user_message_text}'""")
 
-        prompt = prompt_template.format(user_message=user_message_text)
+        prompt = prompt_template.format(user_message_text=self.user_message.text)
         llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
         record = llm.predict(prompt)
 
@@ -208,20 +208,44 @@ class WorkSpace:
         print(f'ETO REC {record}')
         print(type(self.record))
         print(type(record))
-        return json.dumps(self.record)
+        record_dict = json.dumps(record)
+        self.record = record_dict
+        return record_dict
 
     # def save_record(self, product, qty, price, status, total):
-    def save_record(self, product, price, quantity, status, amount):
+    def save_record(self, callable_: functools.partial | None = None, **data_dict):
+
+        if callable_:
+            return callable_()
+
+        session = Session()
+
+        financial_record = FinancialRecord(
+                user_id=self.user_message.from_user.id,
+                username=self.user_message.from_user.username,
+                user_message=self.user_message.text,
+                product=data_dict.get("product"),
+                price=data_dict.get("price"),
+                quantity=data_dict.get("quantity"),
+                status=data_dict.get("status"),
+                amount=data_dict.get("amount")
+            )
+
+        session.add(financial_record)
+        session.commit()
+
+        session.close()
+
 
         return 'Structured JSON record saved successfully'
 
-    async def send_save_buttons(self, chat_id):
+    async def send_save_buttons(self):
         markup_inline = types.InlineKeyboardMarkup()
         item_yes = types.InlineKeyboardButton(text='Yes', callback_data='yes')
         item_no = types.InlineKeyboardButton(text='No', callback_data='no')
 
         markup_inline.add(item_yes, item_no)
-        await self.bot.send_message(chat_id, 'Save data?', reply_markup=markup_inline)
+        await self.bot.send_message(self.user_message.chat.id, 'Save data?', reply_markup=markup_inline)
 
     def build_answer_callback(self):
         @self.bot.callback_query_handler(func=lambda call: True)
@@ -247,66 +271,66 @@ class WorkSpace:
     def _should_check(serialized_obj: dict) -> bool:
         return serialized_obj.get("name") == "save_record"
 
-    async def _approve(self, _input: str, user_message) -> bool:
-        print(f'ETO INPUT {_input}')
-        print(type(_input))
-        print(f'ETO USER_MESSAGE {user_message}')
-        print(type(user_message))
+    async def _approve(self, _input: str) -> bool:
+        # print(f'ETO INPUT {_input}')
+        # print(type(_input))
+        # print(f'ETO USER_MESSAGE {user_message}')
+        # print(type(user_message))
 
         msg = (
             "Do you approve of the following input? "
             "Anything except 'Y'/'Yes' (case-insensitive) will be treated as a no."
         )
         msg += _input
-        await self.bot.reply_to(user_message, msg)
-        await self.send_save_buttons(user_message.chat.id)
+        await self.bot.reply_to(self.user_message, msg)
+        await self.send_save_buttons()
 
         await self._answer_recieved.wait()
 
-        data_dict = ast.literal_eval(_input)
-        print(f'ETO INPUT DICT: {data_dict}')
-        print(type(data_dict))
+        # data_dict = ast.literal_eval(_input)
+        # print(f'ETO INPUT DICT: {data_dict}')
+        # print(type(data_dict))
         
-        if self.answerCall is True:
-            session = Session()
+        # if self.answerCall is True:
+        #     session = Session()
 
-            financial_record = FinancialRecord(
-                user_id=user_message.from_user.id,
-                username=user_message.from_user.username,
-                user_message=user_message.text,
-                product=data_dict.get("product"),
-                price=data_dict.get("price"),
-                quantity=data_dict.get("quantity"),
-                status=data_dict.get("status"),
-                amount=data_dict.get("amount")
-            )
+        #     financial_record = FinancialRecord(
+        #         user_id=user_message.from_user.id,
+        #         username=user_message.from_user.username,
+        #         user_message=user_message.text,
+        #         product=data_dict.get("product"),
+        #         price=data_dict.get("price"),
+        #         quantity=data_dict.get("quantity"),
+        #         status=data_dict.get("status"),
+        #         amount=data_dict.get("amount")
+        #     )
 
-            session.add(financial_record)
-            session.commit()
+        #     session.add(financial_record)
+        #     session.commit()
 
-            session.close()
+        #     session.close()
 
-            user_message.from_user.id
-            user_message.from_user.username
-            user_message.text
+        #     user_message.from_user.id
+        #     user_message.from_user.username
+        #     user_message.text
 
-        elif self.answerCall is False: 
-            print('FINISH YOPTA')
+        # elif self.answerCall is False: 
+        #     print('FINISH YOPTA')
 
         return self.answerCall
 
-    def clarifying_question(self, record, new_user_message):
-        """Useful to clarify the reason why data should not be saved, when user chose 'no' in save_record tool and
-        what changes should be implemented in formal_message in save_record tool"""
+    # def clarifying_question(self, record, new_user_message):
+    #     """Useful to clarify the reason why data should not be saved, when user chose 'no' in save_record tool and
+    #     what changes should be implemented in formal_message in save_record tool"""
 
-        prompt_template = PromptTemplate.from_template(f"""system" Here you get {record}. You should ask user what
-        was wrong in it and what part of it should be changed, you get this info from {new_user_message}, after this
-        you need to rewrite the record and send it back to agent""")
+    #     prompt_template = PromptTemplate.from_template(f"""system" Here you get {record}. You should ask user what
+    #     was wrong in it and what part of it should be changed, you get this info from {new_user_message}, after this
+    #     you need to rewrite the record and send it back to agent""")
 
-        llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
-        new_record = llm.predict(prompt_template)
+    #     llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
+    #     new_record = llm.predict(prompt_template)
 
-        return new_record
+    #     return new_record
 
 
 # class CallbackQueryHandler:
