@@ -34,9 +34,9 @@ async def send_report(message):
 
 
 @bot.message_handler(content_types=["text"])
-def handle_text(message: telebot.types.Message):
-    commands_handler = HandleText(bot)
-    commands_handler.handle_text(message)
+async def handle_text(message: telebot.types.Message):
+    commands_handler = HandleText(bot) 
+    await commands_handler.handle_text(message)
 
 
 asyncio.run(bot.polling())

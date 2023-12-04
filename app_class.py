@@ -41,9 +41,10 @@ class HandleText:
     def __init__(self, bot):
         self.bot = bot
 
-    def handle_text(self, message: telebot.types.Message):
-        agent = MessageProcessor(bot=self.bot, user_message=message)
-        agent.process()
+    async def handle_text(self, message: telebot.types.Message):
+        agent = MessageProcessor(bot=self.bot, user_message=message) # <app_class.MessageProcessor object at 0x7f84f34101c0> <app_class.MessageProcessor object at 0x7f84f34103d0>
+        await agent.process()
+        # pass
 
 
 class SendJson:
@@ -101,13 +102,18 @@ class MessageProcessor:
 
     def __init__(self, bot, user_message):
         self.bot = bot
+        self.session = None
         self.record = {}
         self.answerCall = True
         self._answer_recieved = Event()
         self.build_answer_callback()
         self.user_message = user_message
+        self.save_data_question_message = None
 
-    def process(self):
+
+    async def process(self): # <app_class.MessageProcessor object at 0x7f29bc7381c0> <app_class.MessageProcessor object at 0x7f29bc7cbcd0>
+        self.session = Session()
+
         llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
 
         tools = load_tools(['llm-math'], llm=llm)
@@ -148,9 +154,7 @@ class MessageProcessor:
             verbose=True
         )
 
-        loop = asyncio.get_running_loop()
-
-        result = loop.create_task(agent.arun(
+        result = await agent.arun(
             'Когда ты общаешься с пользователем, представь, что ты - надежный финансовый помощник в их мире. Ты оборудован '
             'различными тулсами (инструментами), которые помогут пользователю эффективно управлять своими финансами.'
             'Один из твоих ключевых инструментов - это функция, которая вытаскивает из сообщений пользователя важные '
@@ -168,9 +172,11 @@ class MessageProcessor:
             #f'Если ты получаешь дополнительное сообщение от клиента об изменениях в текущей записи, то используй '
             #f'clarifyingQuestion tool и передай туда это сообщение {self.user_message.text} под названием new_user_message',
             callbacks=callbacks
-        ))
-        loop.create_task(self.bot.reply_to(self.user_message, result))
+        )
+        await self.bot.reply_to(self.user_message, result)
         print(result)
+        self.session.close()
+
 
     def create_record(self, *args, **kwargs):
         """Useful to transform raw string about financial operations into structured JSON"""
@@ -218,8 +224,6 @@ class MessageProcessor:
         if callable_:
             return callable_()
 
-        session = Session()
-
         financial_record = FinancialRecord(
                 user_id=self.user_message.from_user.id,
                 username=self.user_message.from_user.username,
@@ -231,11 +235,8 @@ class MessageProcessor:
                 amount=data_dict.get("amount")
             )
 
-        session.add(financial_record)
-        session.commit()
-
-        session.close()
-
+        self.session.add(financial_record)
+        self.session.commit()
 
         return 'Structured JSON record saved successfully'
 
@@ -245,10 +246,17 @@ class MessageProcessor:
         item_no = types.InlineKeyboardButton(text='No', callback_data='no')
 
         markup_inline.add(item_yes, item_no)
-        await self.bot.send_message(self.user_message.chat.id, 'Save data?', reply_markup=markup_inline)
+        self.save_data_question_message = await self.bot.send_message(
+            self.user_message.chat.id, 
+            'Save data?', 
+            reply_markup=markup_inline,
+        )
+
+    def filter_callbacks(self, call: telebot.types.CallbackQuery):
+        return call.message.id == self.save_data_question_message.id
 
     def build_answer_callback(self):
-        @self.bot.callback_query_handler(func=lambda call: True)
+        @self.bot.callback_query_handler(func=self.filter_callbacks)
         async def answer(call):
             print("ANSWER")
             if call.data == 'yes':
@@ -256,7 +264,7 @@ class MessageProcessor:
                 await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                                    reply_markup=None)
                 await self.bot.delete_message(call.message.chat.id, call.message.message_id)
-                self.answerCall = True
+                self.answerCall = True 
             elif call.data == 'no':
                 print('NO')
                 await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id,
@@ -265,7 +273,6 @@ class MessageProcessor:
                 await self.bot.delete_message(call.message.chat.id, call.message.message_id)
                 self.answerCall = False
             self._answer_recieved.set()
-            return self.answerCall
 
     @staticmethod
     def _should_check(serialized_obj: dict) -> bool:
@@ -322,14 +329,14 @@ class MessageProcessor:
     # def clarifying_question(self, record, new_user_message):
     #     """Useful to clarify the reason why data should not be saved, when user chose 'no' in save_record tool and
     #     what changes should be implemented in formal_message in save_record tool"""
-
+    #
     #     prompt_template = PromptTemplate.from_template(f"""system" Here you get {record}. You should ask user what
     #     was wrong in it and what part of it should be changed, you get this info from {new_user_message}, after this
     #     you need to rewrite the record and send it back to agent""")
-
+    #
     #     llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
     #     new_record = llm.predict(prompt_template)
-
+    #
     #     return new_record
 
 
@@ -374,4 +381,5 @@ class MessageProcessor:
     #     self.bot.reply_to(user_message, formal_message)
     #
     #     return 'message showed successfully'
+
 
