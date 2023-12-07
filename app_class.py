@@ -279,52 +279,29 @@ class MessageProcessor:
         return serialized_obj.get("name") == "save_record"
 
     async def _approve(self, _input: str) -> bool:
-        # print(f'ETO INPUT {_input}')
-        # print(type(_input))
-        # print(f'ETO USER_MESSAGE {user_message}')
-        # print(type(user_message))
 
         msg = (
             "Do you approve of the following input? "
             "Anything except 'Y'/'Yes' (case-insensitive) will be treated as a no."
         )
+        input_dict = eval(_input)
+
         msg += _input
-        await self.bot.reply_to(self.user_message, msg)
+
+        formatted_message = (
+            f"🛒 Product: {input_dict['product']}\n"
+            f"🔢 Quantity: {input_dict['quantity']}\n"
+            f"💲 Price: {input_dict['price']}\n"
+            f"📉 Status: {input_dict['status']}\n"
+            f"💰 Amount: {input_dict['amount']}"
+        )
+
+        chat_id = self.user_message.chat.id
+        await self.bot.send_message(chat_id, formatted_message)   
         await self.send_save_buttons()
-
         await self._answer_recieved.wait()
-
-        # data_dict = ast.literal_eval(_input)
-        # print(f'ETO INPUT DICT: {data_dict}')
-        # print(type(data_dict))
-        
-        # if self.answerCall is True:
-        #     session = Session()
-
-        #     financial_record = FinancialRecord(
-        #         user_id=user_message.from_user.id,
-        #         username=user_message.from_user.username,
-        #         user_message=user_message.text,
-        #         product=data_dict.get("product"),
-        #         price=data_dict.get("price"),
-        #         quantity=data_dict.get("quantity"),
-        #         status=data_dict.get("status"),
-        #         amount=data_dict.get("amount")
-        #     )
-
-        #     session.add(financial_record)
-        #     session.commit()
-
-        #     session.close()
-
-        #     user_message.from_user.id
-        #     user_message.from_user.username
-        #     user_message.text
-
-        # elif self.answerCall is False: 
-        #     print('FINISH YOPTA')
-
         return self.answerCall
+
 
     # def clarifying_question(self, record, new_user_message):
     #     """Useful to clarify the reason why data should not be saved, when user chose 'no' in save_record tool and
