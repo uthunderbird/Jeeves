@@ -4,13 +4,11 @@
     <title>Financial Records Report</title>
 </head>
 <body>
-    <h1>Financial Records Report</h1>
+    <h2>Financial Records Report</h2>
     <table border="1">
         <tr>
-            <th>Message ID</th>
-            <th>User ID</th>
             <th>Username</th>
-            <th>User Message</th>
+            <th>User message</th>
             <th>Product</th>
             <th>Price</th>
             <th>Quantity</th>
@@ -18,19 +16,17 @@
             <th>Amount</th>
             <th>Timestamp</th>
         </tr>
-        {% for record in records %}
-        <tr>
-            <td>{{ record.message_id }}</td>
-            <td>{{ record.user_id }}</td>
-            <td>{{ record.username }}</td>
-            <td>{{ record.user_message }}</td>
-            <td>{{ record.product }}</td>
-            <td>{{ record.price }}</td>
-            <td>{{ record.quantity }}</td>
-            <td>{{ record.status }}</td>
-            <td>{{ record.amount }}</td>
-            <td>{{ record.timestamp }}</td>
-        </tr>
+        {% for record in financial_records %}
+            <tr>
+                <td>{{ record.username }}</td>
+                <td>{{ record.user_message }}</td>
+                <td>{{ record.product }}</td>
+                <td>{{ record.price }}</td>
+                <td>{{ record.quantity }}</td>
+                <td>{{ record.status }}</td>
+                <td>{{ record.amount }}</td>
+                <td>{{ record.timestamp }}</td>
+            </tr>
         {% endfor %}
     </table>
 </body>

@@ -1,15 +1,14 @@
-import pandas as pd
-from io import StringIO
+from jinja2 import Template
 
 def generate_html_report(financial_records):
-    data = []
-    for record in financial_records:
-        data.append([record.username, record.user_message, record.product, record.price,
-                     record.quantity, record.status, record.amount, record.timestamp])
+    # Load the Jinja2 template from a file (report_template.html)
+    with open("templates/report.html", "r") as template_file:
+        template_content = template_file.read()
 
-    df = pd.DataFrame(data, columns=["Username", "User message", "Product", "Price",
-                                     "Quantity", "Status", "Amount", "Timestamp"])
+    # Create a Jinja2 Template object
+    template = Template(template_content)
 
-    html_content = df.to_html()
+    # Render the template with financial records data
+    html_content = template.render(financial_records=financial_records)
 
     return html_content
