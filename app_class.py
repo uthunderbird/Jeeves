@@ -1,7 +1,7 @@
 import asyncio
 import functools
 import typing
-import ast
+
 from asyncio import Event
 from uuid import UUID
 
@@ -42,7 +42,7 @@ class HandleText:
         self.bot = bot
 
     async def handle_text(self, message: telebot.types.Message):
-        agent = MessageProcessor(bot=self.bot, user_message=message) # <app_class.MessageProcessor object at 0x7f84f34101c0> <app_class.MessageProcessor object at 0x7f84f34103d0>
+        agent = MessageProcessor(bot=self.bot, user_message=message)
         await agent.process()
         # pass
 
@@ -111,7 +111,7 @@ class MessageProcessor:
         self.save_data_question_message = None
 
 
-    async def process(self): # <app_class.MessageProcessor object at 0x7f29bc7381c0> <app_class.MessageProcessor object at 0x7f29bc7cbcd0>
+    async def process(self):
         self.session = Session()
 
         llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
@@ -123,32 +123,18 @@ class MessageProcessor:
 
         agent = initialize_agent(
             tools + [
-                # self.save_record,
                 StructuredTool.from_function(
                     func=self.create_record,
                     name='create_record',
                     description="""Useful to transform raw string about financial operations into structured JSON""",
                     args_schema=self.CreateRecordSchema,
                 ),
-                # Tool.from_function(functools.partial(self.show_formal_message, user_message=user_message),
-                #                    'show_formal_message',
-                #                    """useful for reply to the user message in Telegram bot the result of the
-                #                         create_record tool or for validation, for further confirmation by the user of
-                #                         the correct operation. You need to use this tool immediately after
-                #                         create_record tool and before save_record tool"""),
                 StructuredTool.from_function(
                     func=self.save_record,
                     name='save_record',
                     description="""Useful to save structured dict record into JSON file""",
                     args_schema=self.SaveRecordSchema,
                 ),
-                # StructuredTool.from_function(
-                #     func=self.clarifying_question,
-                #     name='clarifying_question',
-                #     description="""Useful to clarify the reason why data should not be saved, when user chose 'no' 
-                #     in save_record tool and what changes should be implemented in formal_message in save_record tool""",
-                #     args_schema=self.SaveRecordSchema,
-                # ),
         ], llm,
             agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
             verbose=True
@@ -169,8 +155,6 @@ class MessageProcessor:
             'Не забывай использовать свои инструменты максимально эффективно, чтобы сделать опыт пользователя с финансами '
             'более простым и удобным. Чем точнее и полнее ты сможешь обрабатывать информацию, тем лучше ты сможешь помочь '
             f'пользователю в их финансовых запросах. вот это сообщение - {self.user_message.text}.',
-            #f'Если ты получаешь дополнительное сообщение от клиента об изменениях в текущей записи, то используй '
-            #f'clarifyingQuestion tool и передай туда это сообщение {self.user_message.text} под названием new_user_message',
             callbacks=callbacks
         )
         await self.bot.reply_to(self.user_message, result)
@@ -208,17 +192,11 @@ class MessageProcessor:
         llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
         record = llm.predict(prompt)
 
-        # record = json.loads(record)
         self.record = record
-        print(f'ETO SELF REC {self.record}')
-        print(f'ETO REC {record}')
-        print(type(self.record))
-        print(type(record))
         record_dict = json.dumps(record)
         self.record = record_dict
         return record_dict
 
-    # def save_record(self, product, qty, price, status, total):
     def save_record(self, callable_: functools.partial | None = None, **data_dict):
 
         if callable_:
@@ -254,11 +232,9 @@ class MessageProcessor:
 
     def filter_callbacks(self, call: telebot.types.CallbackQuery):
         return call.message.id == self.save_data_question_message.id
-
     def build_answer_callback(self):
         @self.bot.callback_query_handler(func=self.filter_callbacks)
         async def answer(call):
-            print("ANSWER")
             if call.data == 'yes':
                 print('YES')
                 await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
@@ -303,60 +279,15 @@ class MessageProcessor:
         return self.answerCall
 
 
-    # def clarifying_question(self, record, new_user_message):
+    # def clarifying_question(self, new_user_message):
     #     """Useful to clarify the reason why data should not be saved, when user chose 'no' in save_record tool and
     #     what changes should be implemented in formal_message in save_record tool"""
-    #
-    #     prompt_template = PromptTemplate.from_template(f"""system" Here you get {record}. You should ask user what
+
+    #     prompt_template = PromptTemplate.from_template(f"""system" Here you get {self.record}. You should ask user what
     #     was wrong in it and what part of it should be changed, you get this info from {new_user_message}, after this
     #     you need to rewrite the record and send it back to agent""")
-    #
+
     #     llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
     #     new_record = llm.predict(prompt_template)
-    #
+
     #     return new_record
-
-
-# class CallbackQueryHandler:
-#     def __init__(self, bot):
-#         self.bot = bot
-#
-#     def send_save_buttons(self, chat_id):
-#         markup_inline = types.InlineKeyboardMarkup()
-#         item_yes = types.InlineKeyboardButton(text='Yes', callback_data='yes')
-#         item_no = types.InlineKeyboardButton(text='No', callback_data='no')
-#
-#         markup_inline.add(item_yes, item_no)
-#         self.bot.send_message(chat_id, 'Save data?', reply_markup=markup_inline)
-#
-#     @staticmethod
-#     def _should_check(serialized_obj: dict) -> bool:
-#         return serialized_obj.get("name") == "save_record"
-#
-#     def _approve(self, _input: str, user_message) -> bool:
-#         print(f'ETO INPUT {_input}')
-#         print(type(_input))
-#         print(f'ETO USER_MESSAGE {user_message}')
-#         print(type(user_message))
-#         # if 'formal_message' in _input:
-#         #     return True
-#         msg = (
-#             "Do you approve of the following input? "
-#             "Anything except 'Y'/'Yes' (case-insensitive) will be treated as a no."
-#         )
-#         msg += "\n\n" + _input + "\n"
-#         self.bot.reply_to(user_message, msg)
-#         CallbackQueryHandler.send_save_buttons(user_message.chat.id)
-#         resp = input(msg)
-#         return resp.lower() in ("yes", "y")
-
-
-    # def show_formal_message(self, formal_message: str, user_message):
-    #     """useful for reply to the user message in Telegram bot the result of the create_record tool or for validation,
-    #     for further confirmation by the user of the correct operation. You need to use this tool immediately after
-    #     create_record tool and before save_record tool """
-    #     self.bot.reply_to(user_message, formal_message)
-    #
-    #     return 'message showed successfully'
-
-

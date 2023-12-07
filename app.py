@@ -4,7 +4,7 @@ import telebot.async_telebot
 import os
 from dotenv import load_dotenv
 from app_class import SendWelcome, HandleText, SendJson
-from report_generator import PDFGenerator
+#from report_generator import PDFGenerator
 
 load_dotenv()
 
@@ -20,17 +20,10 @@ def send_welcome(message):
 
 
 @bot.message_handler(commands=['report'])
-async def send_report(message):
+async def send_record(message):
     user_id = message.from_user.id
-    pdf_generator = PDFGenerator()
-    pdf_filename = pdf_generator.generate_pdf_report(user_id)
-
-    if pdf_filename:
-        with open(pdf_filename, "rb") as pdf_file:
-            await bot.send_document(message.chat.id, pdf_file, caption="Financial Report")
-        os.remove(pdf_filename)
-    else:
-        await bot.reply_to(message, "Unable to generate the report.")
+    record_link = f"http://localhost:8000/record/{user_id}"
+    await bot.reply_to(message, f"Вы можете просмотреть свои финансовые записи [здесь]({record_link}).")
 
 
 @bot.message_handler(content_types=["text"])

@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import os
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
+import pytz
 
 
 load_dotenv()
@@ -26,10 +27,9 @@ class FinancialRecord(Base):
     quantity = Column(Integer)
     status = Column(String)
     amount = Column(Integer)
-    timestamp = Column(String, default=datetime.datetime.utcnow().strftime('%d-%m-%y %H:%M'))
-
+    timestamp = Column(String, default=lambda: (datetime.datetime.utcnow() + datetime.timedelta(hours=6)).strftime('%d-%m-%y %H:%M'))
+    
 engine = create_engine(DATABASE_URL, echo=True)
 Base.metadata.create_all(bind=engine)
 
 Session = sessionmaker(bind=engine)
-
