@@ -91,7 +91,7 @@ class HumanApprovalCallbackHandler(AsyncCallbackHandler):
 class MessageProcessor:
     instances = {}
 
-    def __new__(cls, bot, user_message):
+    def __new__(cls, bot, user_message, additional_user_message:None):
         user_id = user_message.from_user.id
         if user_id not in cls.instances:
             instance = super(MessageProcessor, cls).__new__(cls)
@@ -109,7 +109,7 @@ class MessageProcessor:
     class CreateRecordSchema(BaseModel):
         user_message_text: str = Field(description='user input text')
 
-    def __init__(self, bot, user_message):
+    def __init__(self, bot, user_message, additional_user_message: None):
         if not hasattr(self, 'is_initialized'):
             self.bot = bot
             self.session = None
@@ -120,11 +120,11 @@ class MessageProcessor:
             self.user_message = user_message
             self.save_data_question_message = None
             self.is_initialized = True
+            self.additional_user_messages = []
 
-        self.additional_user_message = None
-        self.additional_user_messages = []
         if self.additional_user_messages:
-            self.additional_user_messages.append(self.additional_user_message)
+            if additional_user_message:
+                self.additional_user_messages.append(additional_user_message)
 
     async def process(self):
         self.session = Session()
