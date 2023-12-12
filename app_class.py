@@ -123,7 +123,8 @@ class MessageProcessor:
 
         self.additional_user_message = None
         self.additional_user_messages = []
-        self.additional_user_messages.append(self.additional_user_message)
+        if self.additional_user_messages:
+            self.additional_user_messages.append(self.additional_user_message)
 
     async def process(self):
         self.session = Session()
