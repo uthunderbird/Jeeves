@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from app_class import SendWelcome, HandleText, SendJson
 #from report_generator import PDFGenerator
 
+
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")

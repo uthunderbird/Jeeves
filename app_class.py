@@ -89,6 +89,15 @@ class HumanApprovalCallbackHandler(AsyncCallbackHandler):
 
 
 class MessageProcessor:
+    instances = {}
+
+    def __new__(cls, bot, user_message):
+        user_id = user_message.from_user.id
+        if user_id not in cls.instances:
+            instance = super(MessageProcessor, cls).__new__(cls)
+            cls.instances[user_id] = instance
+            return instance
+        return cls.instances[user_id]
 
     class SaveRecordSchema(BaseModel):
         product: str = Field(description='entity')
@@ -101,15 +110,20 @@ class MessageProcessor:
         user_message_text: str = Field(description='user input text')
 
     def __init__(self, bot, user_message):
-        self.bot = bot
-        self.session = None
-        self.record = {}
-        self.answerCall = True
-        self._answer_recieved = Event()
-        self.build_answer_callback()
-        self.user_message = user_message
-        self.save_data_question_message = None
+        if not hasattr(self, 'is_initialized'):
+            self.bot = bot
+            self.session = None
+            self.record = {}
+            self.answerCall = True
+            self._answer_recieved = Event()
+            self.build_answer_callback()
+            self.user_message = user_message
+            self.save_data_question_message = None
+            self.is_initialized = True
 
+        self.additional_user_message = None
+        self.additional_user_messages = []
+        self.additional_user_messages.append(self.additional_user_message)
 
     async def process(self):
         self.session = Session()
@@ -160,7 +174,6 @@ class MessageProcessor:
         await self.bot.reply_to(self.user_message, result)
         print(result)
         self.session.close()
-
 
     def create_record(self, *args, **kwargs):
         """Useful to transform raw string about financial operations into structured JSON"""
