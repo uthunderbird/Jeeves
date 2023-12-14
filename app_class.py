@@ -24,6 +24,8 @@ from langchain.agents import load_tools, initialize_agent, AgentType
 
 from langchain.callbacks import HumanApprovalCallbackHandler
 
+# from router import Router
+
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -42,7 +44,7 @@ class HandleText:
         self.bot = bot
 
     async def handle_text(self, message: telebot.types.Message):
-        agent = MessageProcessor(bot=self.bot, user_message=message)
+        agent = Router(bot=self.bot, user_message=message)
         await agent.process()
         # pass
 
@@ -91,7 +93,7 @@ class HumanApprovalCallbackHandler(AsyncCallbackHandler):
 class MessageProcessor:
     instances = {}
 
-    def __new__(cls, bot, user_message, additional_user_message:None):
+    def __new__(cls, bot, user_message, additional_user_message=None):
         user_id = user_message.from_user.id
         if user_id not in cls.instances:
             instance = super(MessageProcessor, cls).__new__(cls)
@@ -109,7 +111,7 @@ class MessageProcessor:
     class CreateRecordSchema(BaseModel):
         user_message_text: str = Field(description='user input text')
 
-    def __init__(self, bot, user_message, additional_user_message: None):
+    def __init__(self, bot, user_message, additional_user_message: telebot.types.Message | None = None):
         if not hasattr(self, 'is_initialized'):
             self.bot = bot
             self.session = None
@@ -119,14 +121,18 @@ class MessageProcessor:
             self.build_answer_callback()
             self.user_message = user_message
             self.save_data_question_message = None
-            self.is_initialized = True
             self.additional_user_messages = []
+            self.is_initialized = True
 
         if self.additional_user_messages:
             if additional_user_message:
                 self.additional_user_messages.append(additional_user_message)
 
     async def process(self):
+
+        print(f'ETO INSTANCES {MessageProcessor.instances}')
+        print(f'ETO ADDITIONAL MESSAGEG {self.additional_user_messages}')
+
         self.session = Session()
 
         llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
@@ -173,8 +179,12 @@ class MessageProcessor:
             callbacks=callbacks
         )
         await self.bot.reply_to(self.user_message, result)
+        print(f'ETO INSTANCES {MessageProcessor.instances}')
         print(result)
         self.session.close()
+        print(f'ETO INSTANCES {MessageProcessor.instances}')
+        # await self._answer_recieved.wait()
+        return "Processed"
 
     def create_record(self, *args, **kwargs):
         """Useful to transform raw string about financial operations into structured JSON"""
@@ -246,6 +256,7 @@ class MessageProcessor:
 
     def filter_callbacks(self, call: telebot.types.CallbackQuery):
         return call.message.id == self.save_data_question_message.id
+
     def build_answer_callback(self):
         @self.bot.callback_query_handler(func=self.filter_callbacks)
         async def answer(call):
@@ -291,17 +302,3 @@ class MessageProcessor:
         await self.send_save_buttons()
         await self._answer_recieved.wait()
         return self.answerCall
-
-
-    # def clarifying_question(self, new_user_message):
-    #     """Useful to clarify the reason why data should not be saved, when user chose 'no' in save_record tool and
-    #     what changes should be implemented in formal_message in save_record tool"""
-
-    #     prompt_template = PromptTemplate.from_template(f"""system" Here you get {self.record}. You should ask user what
-    #     was wrong in it and what part of it should be changed, you get this info from {new_user_message}, after this
-    #     you need to rewrite the record and send it back to agent""")
-
-    #     llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
-    #     new_record = llm.predict(prompt_template)
-
-    #     return new_record
