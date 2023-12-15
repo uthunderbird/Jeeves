@@ -3,7 +3,7 @@ import asyncio
 import telebot.async_telebot
 import os
 from dotenv import load_dotenv
-from app_class import SendWelcome, HandleText, SendJson
+from app_class import SendWelcome, SendJson
 from routerV2 import Router
 
 #from report_generator import PDFGenerator
@@ -29,15 +29,19 @@ async def send_record(message):
     await bot.reply_to(message, f"Вы можете просмотреть свои финансовые записи [здесь]({record_link}).")
 
 
+# @bot.message_handler(content_types=["text"])
+# async def handle_text(message: telebot.types.Message):
+#     router = Router(bot=bot, user_message=message)
+#     print(f'ETO MESSAGE V BOTE {message.text}')
+#     router.process()
+#
+#
+# asyncio.run(bot.polling())
 @bot.message_handler(content_types=["text"])
 async def handle_text(message: telebot.types.Message):
-    # commands_handler = HandleText(bot)
-    # await commands_handler.handle_text(message)
     router = Router(bot=bot, user_message=message)
     print(f'ETO MESSAGE V BOTE {message.text}')
-    await router.process()
-    # await Router(bot=bot, user_message=message).process()
+    asyncio.create_task(router.process())
 
 
 asyncio.run(bot.polling())
-

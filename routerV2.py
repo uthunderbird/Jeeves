@@ -40,31 +40,28 @@ class Router:
     async def process(self):
 
         template = PromptTemplate.from_template("""system" "Ты должен проанализировать сообщение и определить является 
-        ли сообщение уточнением предыдущего сообщения (запроса), оно похоже на уточнение другого сообщения или новым 
-        самостоятельным сообщением. Верни True если сообщение новое или же False если сообщение - уточняющее." 
+        ли сообщение уточнением предыдущего сообщения (запроса) и похоже на уточнение другого сообщения или новым 
+        самостоятельным сообщением. Верни true если сообщение это полноценное сообщение о финансовой тразакции. 
+        Верни false если сообщение уточняющее, которое уточняет или меняет сообщение о финансовой транзакции. В 
+        уточняющих сообщениях как правило присутствуют слова маркеры, такие как (нет, не, поменяй, измени) и многие 
+        другие." 
         'user message - {user_message_text}'""")
 
         print(f'ETO USER MESSAGE {self.user_message.text}')
 
         prompt = template.format(user_message_text=self.user_message.text)
-        llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8)
+        llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
         result = llm.predict(prompt)
+        print(f'ETO RESULT RAW {result}')
+        if result == 'true':
+            self.result = True
+        else:
+            self.result = False
 
-        print(f'ETO ANALYZE RESULT {result}')
-        print(f'ETO type ANALYZE RESULT {type(result)}')
-
-        bool_result = bool(result)
-        print(f'ETO ANALYZE RESULT 2 {bool_result}')
-        print(f'ETO type ANALYZE RESULT 2 {type(bool_result)}')
-
-        # result = json.loads(result)
-        #
-        # print(f'ETO ANALYZE RESULT json {result}')
-        # print(f'ETO type ANALYZE RESULT json {type(result)}')
+        print(f'ETO ANALYZE RESULT {self.result}')
+        print(f'ETO type ANALYZE RESULT {type(self.result)}')
 
         print(f'ETO USER MESSAGE {self.user_message.text}')
-
-        self.result = bool_result
 
         user_id = self.user_message.from_user.id
         print(f'ETO USER_ID {user_id}')
@@ -80,8 +77,6 @@ class Router:
 
         print(f'ETO PROCESSOR {processor}')
 
-        print(f'ETO USER MESSAGE {self.user_message}')
+        print(f'ETO USER MESSAGE {self.user_message.text}')
 
-        result = await processor.process()
-        print(f'ETO RESULT LOOP {result}')
-        print(f'ETO TYPE {type(result)}')
+        asyncio.create_task(processor.process())
