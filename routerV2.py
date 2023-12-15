@@ -35,7 +35,7 @@ class Router:
     def __init__(self, bot, user_message):
         self.bot = bot
         self.user_message = user_message
-        self.result = None
+        self.is_new = None
 
     async def process(self):
 
@@ -44,7 +44,11 @@ class Router:
         самостоятельным сообщением. Верни true если сообщение это полноценное сообщение о финансовой тразакции. 
         Верни false если сообщение уточняющее, которое уточняет или меняет сообщение о финансовой транзакции. В 
         уточняющих сообщениях как правило присутствуют слова маркеры, такие как (нет, не, поменяй, измени) и многие 
-        другие." 
+        другие. Например новые сообщения могут выглядить вот так: Купил что-то за определённую сумму или продал что-то
+        за определённую сумму или получил доход за что-то или от кого-то. Или потратил на что-то. А уточняющие 
+        сообщения могут выглядить вот так: Не купил, а продал или наоборот не продал, а купил. Или сообщения, которые 
+        исправляют (меняют) количество или цену или что-то ещё. Например не 1500 а 15000 или меняют источник дохода или
+         расхода" 
         'user message - {user_message_text}'""")
 
         print(f'ETO USER MESSAGE {self.user_message.text}')
@@ -54,26 +58,32 @@ class Router:
         result = llm.predict(prompt)
         print(f'ETO RESULT RAW {result}')
         if result == 'true':
-            self.result = True
+            self.is_new = True
         else:
-            self.result = False
+            self.is_new = False
 
-        print(f'ETO ANALYZE RESULT {self.result}')
-        print(f'ETO type ANALYZE RESULT {type(self.result)}')
+        print(f'ETO ANALYZE RESULT {self.is_new}')
+        print(f'ETO type ANALYZE RESULT {type(self.is_new)}')
 
         print(f'ETO USER MESSAGE {self.user_message.text}')
 
         user_id = self.user_message.from_user.id
         print(f'ETO USER_ID {user_id}')
 
-        if self.result:
+        if self.is_new:
             processor = MessageProcessor(self.bot, self.user_message)
         else:
             processor = MessageProcessor.instances.get(user_id)
-            if not processor:
-                processor = MessageProcessor(self.bot, self.user_message)
-            else:
-                processor.additional_user_message = self.user_message
+            assert processor is not None
+            old_message = processor.user_message
+            processor.cancel()
+            processor = MessageProcessor(
+                bot=self.bot,
+                user_message=old_message,
+                additional_user_message=self.user_message
+            )
+
+        MessageProcessor.instances[user_id] = processor
 
         print(f'ETO PROCESSOR {processor}')
 

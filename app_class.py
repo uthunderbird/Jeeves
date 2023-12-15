@@ -90,16 +90,34 @@ class HumanApprovalCallbackHandler(AsyncCallbackHandler):
             )
 
 
+# class MessageProcessorRepository:
+#
+#     def __init__(self):
+#         pass
+#
+#     def get_by_user_id(self, user_id: int) -> 'MessageProcessor' | None:
+#         pass
+#
+#     def create_by_user_id(self, user_id: int) -> 'MessageProcessor':
+#         pass
+#
+#     def extend_by_user_id(self, user_id, new_message: telebot.types.Message):
+#         pass
+
+
+#TODO реализовать сколейку не текста, а фулл сообщения
+
+
 class MessageProcessor:
     instances = {}
 
-    def __new__(cls, bot, user_message, additional_user_message=None):
-        user_id = user_message.from_user.id
-        if user_id not in cls.instances:
-            instance = super(MessageProcessor, cls).__new__(cls)
-            cls.instances[user_id] = instance
-            return instance
-        return cls.instances[user_id]
+    # def __new__(cls, bot, user_message, additional_user_message=None):
+    #     user_id = user_message.from_user.id
+    #     if user_id not in cls.instances:
+    #         instance = super(MessageProcessor, cls).__new__(cls)
+    #         cls.instances[user_id] = instance
+    #         return instance
+    #     return cls.instances[user_id]
 
     class SaveRecordSchema(BaseModel):
         product: str = Field(description='entity')
@@ -109,13 +127,14 @@ class MessageProcessor:
         amount: int = Field(description='amount')
 
     class CreateRecordSchema(BaseModel):
-        user_message_text: str = Field(description='user input text')
+        user_message_text: str = Field(description='user original message text and additional message text')
+        print(f'ETO SCHEMA {user_message_text}')
+        # text
 
     def __init__(self, bot, user_message, additional_user_message: telebot.types.Message | None = None):
         self.spaced_text = ' '
         if not hasattr(self, 'is_initialized'):
             self.bot = bot
-            self.session = None
             self.record = {}
             self.answerCall = True
             self._answer_recieved = Event()
@@ -138,6 +157,10 @@ class MessageProcessor:
         if self.additional_user_message:
             self.text += self.additional_user_message.text
 
+    def cancel(self):
+        self.answerCall = False
+        self._answer_recieved.set()
+
     async def process(self):
 
         print(f'ETO INSTANCES {MessageProcessor.instances}')
@@ -151,8 +174,6 @@ class MessageProcessor:
             self.spaced_text += self.additional_user_message.text
             self.text += self.spaced_text
         print(f'ETO SELF TEXT2 {self.text}')
-
-        self.session = Session()
 
         llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
 
@@ -204,7 +225,6 @@ class MessageProcessor:
             print(f'ETO ADDITIONAL MESSAGE TEXT {self.additional_user_message.text}')
         print(f'ETO SELF TEXT {self.text}')
         print(result)
-        self.session.close()
         print(f'ETO INSTANCES {MessageProcessor.instances}')
         print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
         print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
@@ -254,6 +274,8 @@ class MessageProcessor:
         if callable_:
             return callable_()
 
+        session = Session()
+
         financial_record = FinancialRecord(
                 user_id=self.user_message.from_user.id,
                 username=self.user_message.from_user.username,
@@ -265,8 +287,9 @@ class MessageProcessor:
                 amount=data_dict.get("amount")
             )
 
-        self.session.add(financial_record)
-        self.session.commit()
+        session.add(financial_record)
+        session.commit()
+        session.close()
 
         return 'Structured JSON record saved successfully'
 
