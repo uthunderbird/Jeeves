@@ -48,7 +48,7 @@ class Router:
         за определённую сумму или получил доход за что-то или от кого-то. Или потратил на что-то. А уточняющие 
         сообщения могут выглядить вот так: Не купил, а продал или наоборот не продал, а купил. Или сообщения, которые 
         исправляют (меняют) количество или цену или что-то ещё. Например не 1500 а 15000 или меняют источник дохода или
-         расхода" 
+        расхода" 
         'user message - {user_message_text}'""")
 
         print(f'ETO USER MESSAGE {self.user_message.text}')
@@ -75,7 +75,7 @@ class Router:
         else:
             processor = MessageProcessor.instances.get(user_id)
             assert processor is not None
-            old_message = processor.user_message
+            old_message = processor.full_message
             processor.cancel()
             processor = MessageProcessor(
                 bot=self.bot,

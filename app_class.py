@@ -144,18 +144,14 @@ class MessageProcessor:
             self.additional_user_messages = []
             self.is_initialized = True
             self.text = self.user_message.text
-            self.additional_user_message = additional_user_message
-            if self.additional_user_message:
-                self.text += self.additional_user_message.text
+            self.full_message = self.user_message
 
         self.additional_user_message = additional_user_message
 
         if self.additional_user_message:
-            self.additional_user_messages.append(additional_user_message)
-
-        self.text = self.user_message.text
-        if self.additional_user_message:
             self.text += self.additional_user_message.text
+            self.full_message.text += " "
+            self.full_message.text += self.additional_user_message.text
 
     def cancel(self):
         self.answerCall = False
@@ -163,17 +159,20 @@ class MessageProcessor:
 
     async def process(self):
 
-        print(f'ETO INSTANCES {MessageProcessor.instances}')
-        print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-        print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
-        if self.additional_user_message:
-            print(f'ETO ADDITIONAL MESSAGE TEXT {self.additional_user_message.text}')
-        print(f'ETO SELF TEXT {self.text}')
-
-        if self.additional_user_message:
-            self.spaced_text += self.additional_user_message.text
-            self.text += self.spaced_text
-        print(f'ETO SELF TEXT2 {self.text}')
+        # print(f'ETO INSTANCES {MessageProcessor.instances}')
+        # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
+        # print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
+        # if self.additional_user_message:
+        #     print(f'ETO ADDITIONAL MESSAGE TEXT {self.additional_user_message.text}')
+        # print(f'ETO SELF TEXT {self.text}')
+        #
+        # if self.additional_user_message:
+        #     self.spaced_text += self.additional_user_message.text
+        #     self.text += self.spaced_text
+        #     self.full_message.text += " "
+        #     self.full_message.text += self.additional_user_message.text
+        # print(f'ETO SELF TEXT2 {self.text}')
+        # print(f'ETO FULL MESSAGE TEXT {self.full_message.text}')
 
         llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
 
@@ -219,18 +218,18 @@ class MessageProcessor:
             callbacks=callbacks
         )
         await self.bot.reply_to(self.user_message, result)
-        print(f'ETO INSTANCES {MessageProcessor.instances}')
-        print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-        if self.additional_user_message:
-            print(f'ETO ADDITIONAL MESSAGE TEXT {self.additional_user_message.text}')
-        print(f'ETO SELF TEXT {self.text}')
-        print(result)
-        print(f'ETO INSTANCES {MessageProcessor.instances}')
-        print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-        print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
-        if self.additional_user_message:
-            print(f'ETO ADDITIONAL MESSAGE TEXT {self.additional_user_message.text}')
-        print(f'ETO SELF TEXT {self.text}')
+        # print(f'ETO INSTANCES {MessageProcessor.instances}')
+        # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
+        # if self.additional_user_message:
+        #     print(f'ETO ADDITIONAL MESSAGE TEXT {self.additional_user_message.text}')
+        # print(f'ETO SELF TEXT {self.text}')
+        # print(result)
+        # print(f'ETO INSTANCES {MessageProcessor.instances}')
+        # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
+        # print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
+        # if self.additional_user_message:
+        #     print(f'ETO ADDITIONAL MESSAGE TEXT {self.additional_user_message.text}')
+        # print(f'ETO SELF TEXT {self.text}')
         # await self._answer_recieved.wait()
         return "Processed"
 
@@ -261,7 +260,7 @@ class MessageProcessor:
              'user message - {text}'""")
 
         prompt = prompt_template.format(text=self.text)
-        llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.8)
+        llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8)
         record = llm.predict(prompt)
 
         self.record = record
@@ -277,9 +276,9 @@ class MessageProcessor:
         session = Session()
 
         financial_record = FinancialRecord(
-                user_id=self.user_message.from_user.id,
-                username=self.user_message.from_user.username,
-                user_message=self.user_message.text,
+                user_id=self.full_message.from_user.id,
+                username=self.full_message.from_user.username,
+                user_message=self.full_message.text,
                 product=data_dict.get("product"),
                 price=data_dict.get("price"),
                 quantity=data_dict.get("quantity"),
@@ -313,16 +312,16 @@ class MessageProcessor:
         async def answer(call):
             if call.data == 'yes':
                 print('YES')
-                print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-                print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
+                # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
+                # print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
                 await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                                    reply_markup=None)
                 await self.bot.delete_message(call.message.chat.id, call.message.message_id)
                 self.answerCall = True 
             elif call.data == 'no':
                 print('NO')
-                print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-                print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
+                # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
+                # print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
                 await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id,
                                                          message_id=call.message.message_id,
                                                          reply_markup=None)
@@ -356,6 +355,6 @@ class MessageProcessor:
         await self.bot.send_message(chat_id, formatted_message)   
         await self.send_save_buttons()
         await self._answer_recieved.wait()
-        print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-        print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
+        # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
+        # print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
         return self.answerCall
