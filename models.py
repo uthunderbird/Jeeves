@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
@@ -6,14 +6,13 @@ from dotenv import load_dotenv
 import os
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
-import pytz
-
 
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 Base = declarative_base()
+
 
 class FinancialRecord(Base):
     __tablename__ = 'financial_records'
@@ -27,8 +26,11 @@ class FinancialRecord(Base):
     quantity = Column(Integer)
     status = Column(String)
     amount = Column(Integer)
-    timestamp = Column(String, default=lambda: (datetime.datetime.utcnow() + datetime.timedelta(hours=6)).strftime('%d-%m-%y %H:%M'))
-    
+    timestamp = Column(String, default=lambda: (
+            datetime.datetime.utcnow() + datetime.timedelta(hours=6)
+    ).strftime('%d-%m-%y %H:%M'))
+
+
 engine = create_engine(DATABASE_URL, echo=True)
 Base.metadata.create_all(bind=engine)
 

@@ -1,28 +1,11 @@
 import asyncio
-import functools
-import typing
-import ast
-from asyncio import Event
-from uuid import UUID
-
-import telebot.async_telebot
 import os
 import json
-
-from langchain.callbacks.base import AsyncCallbackHandler
-from langchain.callbacks.human import HumanRejectedException
-
-from models import Session, FinancialRecord
 from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.tools import StructuredTool
-from pydantic.v1 import BaseModel, Field
-from telebot import types
-from langchain.agents import Tool
 from langchain.prompts import PromptTemplate
 from langchain.agents import load_tools, initialize_agent, AgentType
-
-from langchain.callbacks import HumanApprovalCallbackHandler
 from app_class import MessageProcessor
 
 load_dotenv()
@@ -43,7 +26,6 @@ class Router:
 
         agent = initialize_agent(
             tools + [
-                # self.analyze_message,
                 StructuredTool.from_function(
                     func=self.process_message,
                     name='process_message',

@@ -7,6 +7,7 @@ from datetime import datetime, date
 
 app = FastAPI()
 
+
 @app.get("/record/{user_id}", response_class=HTMLResponse)
 async def read_record_html(user_id: int):
     with Session() as session:
@@ -18,6 +19,7 @@ async def read_record_html(user_id: int):
     html_content = generate_html_report(financial_records)
 
     return HTMLResponse(content=html_content)
+
 
 @app.get("/api/record/{user_id}", response_class=JSONResponse)
 async def read_record_api(
@@ -43,7 +45,10 @@ async def read_record_api(
         financial_records = query.all()
 
     if not financial_records:
-        raise HTTPException(status_code=404, detail=f"Для пользователя {user_id} не найдено финансовых записей за {target_date.year}-{target_date.month}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Для пользователя {user_id} не найдено финансовых записей за {target_date.year}-{target_date.month}"
+        )
 
     records_json = [
         {

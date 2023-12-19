@@ -1,30 +1,21 @@
-import asyncio
 import functools
 import typing
-
 from asyncio import Event
 from uuid import UUID
-
 import telebot.async_telebot
 import os
 import json
-
 from langchain.callbacks.base import AsyncCallbackHandler
 from langchain.callbacks.human import HumanRejectedException
-
 from models import Session, FinancialRecord
 from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.tools import StructuredTool
 from pydantic.v1 import BaseModel, Field
 from telebot import types
-from langchain.agents import Tool
 from langchain.prompts import PromptTemplate
 from langchain.agents import load_tools, initialize_agent, AgentType
-
-from langchain.callbacks import HumanApprovalCallbackHandler
-
-# from routerV2 import Router
+# from langchain.callbacks import HumanApprovalCallbackHandler
 
 load_dotenv()
 
@@ -37,16 +28,6 @@ class SendWelcome:
 
     def send_welcome(self, message: telebot.types.Message):
         self.bot.reply_to(message, f"Howdy, how are you doing {message.from_user.first_name}?")
-
-
-# class HandleText:
-#     def __init__(self, bot):
-#         self.bot = bot
-#
-#     async def handle_text(self, message: telebot.types.Message):
-#         agent = Router(bot=self.bot, user_message=message)
-#         await agent.process()
-#         # pass
 
 
 class SendJson:
@@ -90,34 +71,8 @@ class HumanApprovalCallbackHandler(AsyncCallbackHandler):
             )
 
 
-# class MessageProcessorRepository:
-#
-#     def __init__(self):
-#         pass
-#
-#     def get_by_user_id(self, user_id: int) -> 'MessageProcessor' | None:
-#         pass
-#
-#     def create_by_user_id(self, user_id: int) -> 'MessageProcessor':
-#         pass
-#
-#     def extend_by_user_id(self, user_id, new_message: telebot.types.Message):
-#         pass
-
-
-#TODO реализовать сколейку не текста, а фулл сообщения
-
-
 class MessageProcessor:
     instances = {}
-
-    # def __new__(cls, bot, user_message, additional_user_message=None):
-    #     user_id = user_message.from_user.id
-    #     if user_id not in cls.instances:
-    #         instance = super(MessageProcessor, cls).__new__(cls)
-    #         cls.instances[user_id] = instance
-    #         return instance
-    #     return cls.instances[user_id]
 
     class SaveRecordSchema(BaseModel):
         product: str = Field(description='entity')
@@ -129,7 +84,6 @@ class MessageProcessor:
     class CreateRecordSchema(BaseModel):
         user_message_text: str = Field(description='user original message text and additional message text')
         print(f'ETO SCHEMA {user_message_text}')
-        # text
 
     def __init__(self, bot, user_message, additional_user_message: telebot.types.Message | None = None):
         self.spaced_text = ' '
@@ -158,21 +112,6 @@ class MessageProcessor:
         self._answer_recieved.set()
 
     async def process(self):
-
-        # print(f'ETO INSTANCES {MessageProcessor.instances}')
-        # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-        # print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
-        # if self.additional_user_message:
-        #     print(f'ETO ADDITIONAL MESSAGE TEXT {self.additional_user_message.text}')
-        # print(f'ETO SELF TEXT {self.text}')
-        #
-        # if self.additional_user_message:
-        #     self.spaced_text += self.additional_user_message.text
-        #     self.text += self.spaced_text
-        #     self.full_message.text += " "
-        #     self.full_message.text += self.additional_user_message.text
-        # print(f'ETO SELF TEXT2 {self.text}')
-        # print(f'ETO FULL MESSAGE TEXT {self.full_message.text}')
 
         llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
 
@@ -218,19 +157,6 @@ class MessageProcessor:
             callbacks=callbacks
         )
         await self.bot.reply_to(self.user_message, result)
-        # print(f'ETO INSTANCES {MessageProcessor.instances}')
-        # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-        # if self.additional_user_message:
-        #     print(f'ETO ADDITIONAL MESSAGE TEXT {self.additional_user_message.text}')
-        # print(f'ETO SELF TEXT {self.text}')
-        # print(result)
-        # print(f'ETO INSTANCES {MessageProcessor.instances}')
-        # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-        # print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
-        # if self.additional_user_message:
-        #     print(f'ETO ADDITIONAL MESSAGE TEXT {self.additional_user_message.text}')
-        # print(f'ETO SELF TEXT {self.text}')
-        # await self._answer_recieved.wait()
         return "Processed"
 
     def create_record(self, *args, **kwargs):
@@ -311,17 +237,14 @@ class MessageProcessor:
         @self.bot.callback_query_handler(func=self.filter_callbacks)
         async def answer(call):
             if call.data == 'yes':
-                print('YES')
-                # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-                # print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
-                await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                                   reply_markup=None)
+                await self.bot.edit_message_reply_markup(
+                    chat_id=call.message.chat.id,
+                    message_id=call.message.message_id,
+                    reply_markup=None
+                )
                 await self.bot.delete_message(call.message.chat.id, call.message.message_id)
                 self.answerCall = True 
             elif call.data == 'no':
-                print('NO')
-                # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-                # print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
                 await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id,
                                                          message_id=call.message.message_id,
                                                          reply_markup=None)
@@ -355,6 +278,4 @@ class MessageProcessor:
         await self.bot.send_message(chat_id, formatted_message)   
         await self.send_save_buttons()
         await self._answer_recieved.wait()
-        # print(f'ETO ADDITIONAL MESSAGES {self.additional_user_messages}')
-        # print(f'ETO ADDITIONAL MESSAGE {self.additional_user_message}')
         return self.answerCall
