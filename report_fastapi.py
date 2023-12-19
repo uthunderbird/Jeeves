@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
 from models import FinancialRecord, Session
 from sqlalchemy import extract, func
 from report_generator import generate_html_report
@@ -7,18 +8,12 @@ from datetime import datetime, date
 
 app = FastAPI()
 
+templates = Jinja2Templates(directory="templates")
+
 
 @app.get("/record/{user_id}", response_class=HTMLResponse)
-async def read_record_html(user_id: int):
-    with Session() as session:
-        financial_records = session.query(FinancialRecord).filter_by(user_id=user_id).all()
-
-    if not financial_records:
-        raise HTTPException(status_code=404, detail="Для указанного пользователя не найдено финансовых записей.")
-
-    html_content = generate_html_report(financial_records)
-
-    return HTMLResponse(content=html_content)
+async def read_record_html(request: Request, user_id: int):
+    return templates.TemplateResponse("report.html", {"request": request, "user_id": user_id})
 
 
 @app.get("/api/record/{user_id}", response_class=JSONResponse)

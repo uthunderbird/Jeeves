@@ -1,33 +1,106 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Financial Records Report</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Финансовые записи</title>
 </head>
 <body>
-    <h2>Financial Records Report</h2>
-    <table border="1">
-        <tr>
-            <th>Username</th>
-            <th>User message</th>
-            <th>Product</th>
-            <th>Price</th>
-            <th>Quantity</th>
-            <th>Status</th>
-            <th>Amount</th>
-            <th>Timestamp</th>
-        </tr>
-        {% for record in financial_records %}
-            <tr>
-                <td>{{ record.username }}</td>
-                <td>{{ record.user_message }}</td>
-                <td>{{ record.product }}</td>
-                <td>{{ record.price }}</td>
-                <td>{{ record.quantity }}</td>
-                <td>{{ record.status }}</td>
-                <td>{{ record.amount }}</td>
-                <td>{{ record.timestamp }}</td>
-            </tr>
-        {% endfor %}
-    </table>
+
+<h1>Финансовые записи</h1>
+
+<button onclick="showAllRecords()">Показать все записи</button><br><br>
+
+<label for="targetMonth">Выберите месяц:</label>
+<select id="targetMonth" name="targetMonth">
+    <option value="1">Январь</option>
+    <option value="2">Февраль</option>
+    <option value="3">Март</option>
+    <option value="4">Апрель</option>
+    <option value="5">Май</option>
+    <option value="6">Июнь</option>
+    <option value="7">Июль</option>
+    <option value="8">Август</option>
+    <option value="9">Сентябрь</option>
+    <option value="10">Октябрь</option>
+    <option value="11">Ноябрь</option>
+    <option value="12">Декабрь</option>
+</select>
+
+<label for="targetYear">Выберите год:</label>
+<select id="targetYear" name="targetYear">
+    <option value="2022">2022</option>
+    <option value="2023">2023</option>
+    <option value="2024">2024</option>
+    <option value="2025">2025</option>
+    <option value="2026">2026</option>
+    <option value="2027">2027</option>
+    <option value="2028">2028</option>
+    <option value="2029">2029</option>
+    <option value="2030">2030</option>
+</select>
+<br>
+<button onclick="showRecords()">Показать</button>
+
+<div id="recordsContainer">
+    <table border="1" id="recordsTable"></table>
+</div>
+
+<div id="noRecordsMessage" style="display: none; color: red;">
+    Записей за указанный период нет.
+</div>
+
+<script>
+    const userId = "{{ user_id }}";
+
+    async function showRecords() {
+        const targetMonth = document.getElementById("targetMonth").value;
+        const targetYear = document.getElementById("targetYear").value;
+        const targetDate = `${targetYear}-${targetMonth}`;
+        
+        const response = await fetch(`/api/record/${userId}?target_date=${targetDate}`);
+        const records = await response.json();
+        updateRecordsContainer(records);
+    }
+
+    async function showAllRecords() {
+        const response = await fetch(`/api/record/${userId}`);
+        const records = await response.json();
+        updateRecordsContainer(records);
+    }
+
+    function updateRecordsContainer(records) {
+        const recordsTable = document.getElementById("recordsTable");
+        const noRecordsMessage = document.getElementById("noRecordsMessage");
+
+        recordsTable.innerHTML = "";
+        noRecordsMessage.style.display = "none";
+
+        if (records.length === 0) {
+            noRecordsMessage.style.display = "block";
+            return;
+        }
+
+        const headers = ["Имя пользователя", "Сообщение пользователя", "Продукт", "Цена", "Количество", "Статус", "Сумма", "Временная метка"];
+        const headerRow = document.createElement("tr");
+        headers.forEach(headerText => {
+            const th = document.createElement("th");
+            th.textContent = headerText;
+            headerRow.appendChild(th);
+        });
+        recordsTable.appendChild(headerRow);
+
+        records.forEach(record => {
+            const row = document.createElement("tr");
+            Object.values(record).forEach(value => {
+                const td = document.createElement("td");
+                td.textContent = value;
+                row.appendChild(td);
+            });
+            recordsTable.appendChild(row);
+        });
+    }
+</script>
+
 </body>
 </html>
