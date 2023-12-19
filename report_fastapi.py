@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from models import FinancialRecord, Session
 from sqlalchemy import extract, func
-from report_generator import generate_html_report
 from datetime import datetime, date
 
 app = FastAPI()
