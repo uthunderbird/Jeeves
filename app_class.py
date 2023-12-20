@@ -86,7 +86,7 @@ class MessageProcessor:
         print(f'ETO SCHEMA {user_message_text}')
 
     def __init__(self, bot, user_message, additional_user_message: telebot.types.Message | None = None):
-        self.spaced_text = ' '
+        self.spaced_text = '; '
         if not hasattr(self, 'is_initialized'):
             self.bot = bot
             self.record = {}
@@ -140,7 +140,7 @@ class MessageProcessor:
         )
 
         result = await agent.arun(
-            'Когда ты общаешься с пользователем, представь, что ты - надежный финансовый помощник в их мире. Ты оборудован '
+            'System: Когда ты общаешься с пользователем, представь, что ты - надежный финансовый помощник в их мире. Ты оборудован '
             'различными тулсами (инструментами), которые помогут пользователю эффективно управлять своими финансами.'
             'Один из твоих ключевых инструментов - это функция, которая вытаскивает из сообщений пользователя важные '
             'сущности, такие как названия товаров, количество, цены и общие суммы. Когда пользователь делится информацией '
@@ -153,7 +153,8 @@ class MessageProcessor:
             'и учете операций.'
             'Не забывай использовать свои инструменты максимально эффективно, чтобы сделать опыт пользователя с финансами '
             'более простым и удобным. Чем точнее и полнее ты сможешь обрабатывать информацию, тем лучше ты сможешь помочь '
-            f'пользователю в их финансовых запросах. вот это сообщение - {self.text}.',
+            f'пользователю в их финансовых запросах.'
+            f'User: {self.text}',
             callbacks=callbacks
         )
         await self.bot.reply_to(self.user_message, result)
@@ -183,6 +184,8 @@ class MessageProcessor:
              "Status: (here should be status you got from the message, whether it was"
              "spent or gained, if spent - write 'Expenses', if gained - write 'Income' "
              "Amount: (there should be a sum here, the sum is equal to the quantity multiplied by the price),
+             "you should always call create_record tool and then save_record tool even if you are not sure about
+             values in all fields"
              'user message - {text}'""")
 
         prompt = prompt_template.format(text=self.text)
@@ -221,16 +224,18 @@ class MessageProcessor:
     async def send_save_buttons(self):
         markup_inline = types.InlineKeyboardMarkup()
         item_yes = types.InlineKeyboardButton(text='Yes', callback_data='yes')
-        item_no = types.InlineKeyboardButton(text='No', callback_data='no')
+        # item_no = types.InlineKeyboardButton(text='No', callback_data='no')
 
-        markup_inline.add(item_yes, item_no)
+        markup_inline.add(item_yes)
         self.save_data_question_message = await self.bot.send_message(
             self.user_message.chat.id, 
-            'Save data?', 
+            'If everything is correct press "yes", else tell me what i should change',
             reply_markup=markup_inline,
         )
 
     def filter_callbacks(self, call: telebot.types.CallbackQuery):
+        if self.save_data_question_message is None:
+            return False
         return call.message.id == self.save_data_question_message.id
 
     def build_answer_callback(self):

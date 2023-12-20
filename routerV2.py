@@ -54,14 +54,17 @@ class Router:
             processor = MessageProcessor(self.bot, self.user_message)
         else:
             processor = MessageProcessor.instances.get(user_id)
-            assert processor is not None
-            old_message = processor.full_message
-            processor.cancel()
-            processor = MessageProcessor(
-                bot=self.bot,
-                user_message=old_message,
-                additional_user_message=self.user_message
-            )
+            # assert processor is not None
+            if processor is None:
+                processor = MessageProcessor(self.bot, self.user_message)
+            else:
+                old_message = processor.full_message
+                processor.cancel()
+                processor = MessageProcessor(
+                    bot=self.bot,
+                    user_message=old_message,
+                    additional_user_message=self.user_message
+                )
 
         MessageProcessor.instances[user_id] = processor
         asyncio.create_task(processor.process())

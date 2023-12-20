@@ -1,6 +1,7 @@
 import asyncio
-import telebot.async_telebot
+import logging
 import os
+import telebot.async_telebot
 from dotenv import load_dotenv
 from app_class import SendWelcome
 from routerV2 import Router
@@ -11,6 +12,9 @@ load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 bot = telebot.async_telebot.AsyncTeleBot(TELEGRAM_TOKEN)
+
+telebot_logger = logging.getLogger('TeleBot')
+telebot_logger.setLevel(logging.DEBUG)
 
 
 @bot.message_handler(commands=['start'])

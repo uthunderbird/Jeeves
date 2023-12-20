@@ -15,6 +15,18 @@ async def read_record_html(request: Request, user_id: int):
     return templates.TemplateResponse("report.html", {"request": request, "user_id": user_id})
 
 
+@app.get("/api/record/sum/{user_id}", response_class=JSONResponse)
+async def get_records_sum(user_id: int):
+    with Session() as session:
+        query = session.query(
+            func.sum(FinancialRecord.amount).label("total_amount"),
+            FinancialRecord.status
+        ).filter_by(user_id=user_id).group_by(FinancialRecord.status).all()
+
+    sums_by_status = {status: total_amount for total_amount, status in query}
+    return JSONResponse(content=sums_by_status)
+
+
 @app.get("/api/record/{user_id}", response_class=JSONResponse)
 async def read_record_api(
     user_id: int,
