@@ -13,8 +13,8 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 bot = telebot.async_telebot.AsyncTeleBot(TELEGRAM_TOKEN)
 
-telebot_logger = logging.getLogger('TeleBot')
-telebot_logger.setLevel(logging.DEBUG)
+# telebot_logger = logging.getLogger('TeleBot')
+# telebot_logger.setLevel(logging.DEBUG)
 
 
 @bot.message_handler(commands=['start'])

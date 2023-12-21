@@ -16,6 +16,7 @@ class Router:
         self.bot = bot
         self.user_message = user_message
         self.is_new = None
+        self.old_message = None
 
     async def process(self):
 
@@ -35,17 +36,26 @@ class Router:
         Получил а не потратил. Измени количество на 20. Это общая цена. Цена за единицу товара)."
         'user message - {user_message_text}'""")
 
-        prompt = template.format(user_message_text=self.user_message.text)
-        llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8, verbose=True)
-        result = llm.predict(prompt)
-        print(f'ETO SELF USER MESSAGE {self.user_message.text}')
-        print(f'ETO RUSULT {result}')
-        if 'true' in result:
-            self.is_new = True
-        elif 'false' in result:
+        if self.user_message.reply_to_message:
             self.is_new = False
         else:
-            self.is_new = True
+
+            prompt = template.format(user_message_text=self.user_message.text)
+            llm = ChatOpenAI(
+                model_name="gpt-4-1106-preview",
+                openai_api_key=OPENAI_API_KEY,
+                temperature=0.8,
+                verbose=True
+            )
+            result = llm.predict(prompt)
+
+            if 'true' in result:
+                self.is_new = True
+            elif 'false' in result:
+                self.is_new = False
+            else:
+                self.is_new = True
+
         print(f'eto is_new {self.is_new}')
 
         user_id = self.user_message.from_user.id
@@ -54,15 +64,14 @@ class Router:
             processor = MessageProcessor(self.bot, self.user_message)
         else:
             processor = MessageProcessor.instances.get(user_id)
-            # assert processor is not None
             if processor is None:
                 processor = MessageProcessor(self.bot, self.user_message)
             else:
-                old_message = processor.full_message
+                self.old_message = processor.full_message
                 processor.cancel()
                 processor = MessageProcessor(
                     bot=self.bot,
-                    user_message=old_message,
+                    user_message=self.old_message,
                     additional_user_message=self.user_message
                 )
 
