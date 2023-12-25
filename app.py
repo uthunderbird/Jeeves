@@ -1,11 +1,9 @@
 import asyncio
-import logging
 import os
 import telebot.async_telebot
 from dotenv import load_dotenv
 from app_class import SendWelcome
 from routerV2 import Router
-
 
 load_dotenv()
 
@@ -13,14 +11,11 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 bot = telebot.async_telebot.AsyncTeleBot(TELEGRAM_TOKEN)
 
-# telebot_logger = logging.getLogger('TeleBot')
-# telebot_logger.setLevel(logging.DEBUG)
-
 
 @bot.message_handler(commands=['start'])
-def send_welcome(message):
+async def send_welcome(message):
     commands_handler = SendWelcome(bot)
-    commands_handler.send_welcome(message)
+    await commands_handler.send_welcome(message)
 
 
 @bot.message_handler(commands=['report'])
@@ -38,3 +33,12 @@ async def handle_text(message: telebot.types.Message):
 
 
 asyncio.run(bot.polling())
+
+# loop = asyncio.get_event_loop()
+# loop.run_until_complete(bot.polling())
+
+# async def start(bot):
+#     await bot.polling()
+#
+#
+# start(bot=bot)

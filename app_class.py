@@ -26,8 +26,8 @@ class SendWelcome:
     def __init__(self, bot):
         self.bot = bot
 
-    def send_welcome(self, message: telebot.types.Message):
-        self.bot.reply_to(message, f"Howdy, how are you doing {message.from_user.first_name}?")
+    async def send_welcome(self, message: telebot.types.Message):
+        await self.bot.reply_to(message, f"Howdy, how are you doing {message.from_user.first_name}?")
 
 
 class SendJson:
