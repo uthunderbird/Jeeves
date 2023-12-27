@@ -6,7 +6,6 @@ from langchain.prompts import PromptTemplate
 from app_class import MessageProcessor
 
 import redis
-# import pickle
 import dill as pickle
 
 load_dotenv()
@@ -25,19 +24,16 @@ class Router:
 
     @staticmethod
     def save_processor(user_id, processor):
-        # Сериализация объекта processor с помощью pickle
         processor_data = pickle.dumps(processor)
-        # Сохранение в Redis с временем жизни 600 секунд (10 минут)
         Router.redis_client.setex(user_id, 600, processor_data)
 
     @staticmethod
     def get_processor(user_id):
-        # Извлечение объекта из Redis и десериализация
         processor_data = Router.redis_client.get(user_id)
         if processor_data:
             processor = pickle.loads(processor_data)
-            return processor  # Вернуть десериализованный объект
-        return None  # Если объекта нет в Redis
+            return processor
+        return None
 
     async def process(self):
 
