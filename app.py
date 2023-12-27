@@ -33,12 +33,3 @@ async def handle_text(message: telebot.types.Message):
 
 
 asyncio.run(bot.polling())
-
-# loop = asyncio.get_event_loop()
-# loop.run_until_complete(bot.polling())
-
-# async def start(bot):
-#     await bot.polling()
-#
-#
-# start(bot=bot)

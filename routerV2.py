@@ -5,18 +5,39 @@ from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from app_class import MessageProcessor
 
+import redis
+# import pickle
+import dill as pickle
+
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 
 class Router:
+    redis_client = redis.StrictRedis(host='redis', port=6379, db=0)
 
     def __init__(self, bot, user_message):
         self.bot = bot
         self.user_message = user_message
         self.is_new = None
         self.old_message = None
+
+    @staticmethod
+    def save_processor(user_id, processor):
+        # Сериализация объекта processor с помощью pickle
+        processor_data = pickle.dumps(processor)
+        # Сохранение в Redis с временем жизни 600 секунд (10 минут)
+        Router.redis_client.setex(user_id, 600, processor_data)
+
+    @staticmethod
+    def get_processor(user_id):
+        # Извлечение объекта из Redis и десериализация
+        processor_data = Router.redis_client.get(user_id)
+        if processor_data:
+            processor = pickle.loads(processor_data)
+            return processor  # Вернуть десериализованный объект
+        return None  # Если объекта нет в Redis
 
     async def process(self):
 
@@ -63,7 +84,8 @@ class Router:
         if self.is_new:
             processor = MessageProcessor(self.bot, self.user_message)
         else:
-            processor = MessageProcessor.instances.get(user_id)
+            # processor = MessageProcessor.instances.get(user_id)
+            processor = Router.get_processor(user_id)
             if processor is None:
                 processor = MessageProcessor(self.bot, self.user_message)
             else:
@@ -75,5 +97,6 @@ class Router:
                     additional_user_message=self.user_message
                 )
 
-        MessageProcessor.instances[user_id] = processor
+        # MessageProcessor.instances[user_id] = processor
+        Router.save_processor(user_id, processor)
         asyncio.create_task(processor.process())

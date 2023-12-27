@@ -2,6 +2,10 @@ import functools
 import typing
 from asyncio import Event
 from uuid import UUID
+
+import _asyncio
+import asyncio
+
 import telebot.async_telebot
 import os
 import json
@@ -106,6 +110,52 @@ class MessageProcessor:
             self.text += self.additional_user_message.text
             self.full_message.text += " "
             self.full_message.text += self.additional_user_message.text
+
+    # def __getstate__(self):
+    #     # Создаем словарь состояния объекта для сериализации
+    #     state = self.__dict__.copy()
+    #     # Исключаем локальный объект 'answer' из сериализации
+    #     if 'answer' in state:
+    #         del state['answer_wrapper']
+    #     return state
+
+    # def __getstate__(self):
+    #     # Просто возвращаем копию словаря состояния объекта для сериализации
+    #     return self.__dict__.copy()
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Удаление объектов _asyncio.Future из состояния
+        for key, value in list(state.items()):
+            if isinstance(value, asyncio.Future):
+                del state[key]
+        for key in list(state.keys()):
+            if isinstance(state[key], _asyncio.Future):
+                del state[key]
+        if '_answer_recieved' in state:
+            del state['_answer_recieved']
+        return state
+
+    # def __getstate__(self):
+    #     state = self.__dict__.copy()
+    #     # Удаление объектов asyncio.Future и _asyncio.Future из состояния
+    #     for key in list(state.keys()):
+    #         if isinstance(state[key], (asyncio.Future, asyncio.futures.Future)):
+    #             del state[key]
+    #     return state
+
+    def __setstate__(self, state):
+        # Восстанавливаем состояние объекта из словаря
+        self.__dict__.update(state)
+        # Восстановление функциональности, связанной с answer
+        # Переопределение метода build_answer_callback, чтобы обновить состояние после десериализации
+        self._answer_recieved = asyncio.Event()
+
+    # def __setstate__(self, state):
+    #     # Восстанавливаем состояние объекта из словаря
+    #     self.__dict__.update(state)
+    #     # Восстанавливаем 'answer' или устанавливаем его в None (или другое подходящее значение)
+    #     self.answer = None  # или другое значение по умолчанию
 
     def cancel(self):
         self.answerCall = False
@@ -238,24 +288,46 @@ class MessageProcessor:
             return False
         return call.message.id == self.save_data_question_message.id
 
+    # def build_answer_callback(self):
+    #     @self.bot.callback_query_handler(func=self.filter_callbacks)
+    #     async def answer(call):
+    #         if call.data == 'yes':
+    #             await self.bot.edit_message_reply_markup(
+    #                 chat_id=call.message.chat.id,
+    #                 message_id=call.message.message_id,
+    #                 reply_markup=None
+    #             )
+    #             await self.bot.delete_message(call.message.chat.id, call.message.message_id)
+    #             self.answerCall = True
+    #         elif call.data == 'no':
+    #             await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id,
+    #                                                      message_id=call.message.message_id,
+    #                                                      reply_markup=None)
+    #             await self.bot.delete_message(call.message.chat.id, call.message.message_id)
+    #             self.answerCall = False
+    #         self._answer_recieved.set()
+
+    async def answer_wrapper(self, call):
+        if call.data == 'yes':
+            await self.bot.edit_message_reply_markup(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=None
+            )
+            await self.bot.delete_message(call.message.chat.id, call.message.message_id)
+            self.answerCall = True
+        elif call.data == 'no':
+            await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id,
+                                                     message_id=call.message.message_id,
+                                                     reply_markup=None)
+            await self.bot.delete_message(call.message.chat.id, call.message.message_id)
+            self.answerCall = False
+        self._answer_recieved.set()
+
     def build_answer_callback(self):
         @self.bot.callback_query_handler(func=self.filter_callbacks)
-        async def answer(call):
-            if call.data == 'yes':
-                await self.bot.edit_message_reply_markup(
-                    chat_id=call.message.chat.id,
-                    message_id=call.message.message_id,
-                    reply_markup=None
-                )
-                await self.bot.delete_message(call.message.chat.id, call.message.message_id)
-                self.answerCall = True 
-            elif call.data == 'no':
-                await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id,
-                                                         message_id=call.message.message_id,
-                                                         reply_markup=None)
-                await self.bot.delete_message(call.message.chat.id, call.message.message_id)
-                self.answerCall = False
-            self._answer_recieved.set()
+        async def answer_wrapper(call):
+            await self.answer_wrapper(call)
 
     @staticmethod
     def _should_check(serialized_obj: dict) -> bool:
