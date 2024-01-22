@@ -1,99 +1,67 @@
-import asyncio
-import os
-from dotenv import load_dotenv
-from langchain.chat_models import ChatOpenAI
-from langchain.prompts import PromptTemplate
-from app_class import MessageProcessor
-
-import redis
-import dill as pickle
-
-load_dotenv()
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-REDIS_HOST = os.getenv("REDIS_HOST")
-
-
-class Router:
-    redis_client = redis.StrictRedis(host=REDIS_HOST, port=6379, db=0)
-
-    def __init__(self, bot, user_message):
-        self.bot = bot
-        self.user_message = user_message
-        self.is_new = None
-        self.old_message = None
-
-    @staticmethod
-    def save_processor(user_id, processor):
-        processor_data = pickle.dumps(processor)
-        Router.redis_client.setex(user_id, 600, processor_data)
-
-    @staticmethod
-    def get_processor(user_id):
-        processor_data = Router.redis_client.get(user_id)
-        if processor_data:
-            processor = pickle.loads(processor_data)
-            return processor
-        return None
-
-    async def process(self):
-
-        template = PromptTemplate.from_template("""system" "Проанализируй сообщение и определи тип сообщения. Верни 
-        (false), если сообщение уточняющее. Верни (true), если сообщение полноценное (новое).У тебя 
-        есть два типа сообщщений. Первый тип сообщений - это полноценное. Из которой можно получить товар или услугу или
-        источник, за которую пользователь получил или заплатил определённую сумму денег, или даже не денег, а произошёл 
-        обмен или подарок. Примеры таких самостоятельных сообщений - (Купил что-то за определённую сумму. Продал что-то 
-        за определённую сумму. Получил доход за что-то или от кого-то. Потратил на чо-то. Свершил какое-то действие на 
-        определённую сумму. Такси за 2000. Заказ на 5к. Приготовил еды на 150 000. Пожрал говна на 200. Погуляли на лям.
-        Получил зарплату 800к. Бабушка подарила 100$. Натанцевал на 20 тыщ. Оплатил интернет. Выйграл в казино. Нашёл 
-        500 баксов. Украл 800 лямов. И подобные.) Второй тип сообщений - это уточняющие сообщения. Исходя из которого 
-        можно поменять в предыдущем сообщение что-либо, например товар, количество, статус (траты или доход), цена за 
-        единицу или общую цену или что-то ещё. Обычно в таких уточняющих предложениях есть слова маркеры, такие как 
-        (нет, не, помеяй, измени). Но бывают и уточняющие предложения без слов маркеров. Например (5 бутылок). 
-        Вот примеры уточняющих сообщений - (Не купил, а продал. Не 15000 а 150000. 8 бутылок. 
-        Получил а не потратил. Измени количество на 20. Это общая цена. Цена за единицу товара)."
-        'user message - {user_message_text}'""")
-
-        if self.user_message.reply_to_message:
-            self.is_new = False
-        else:
-
-            prompt = template.format(user_message_text=self.user_message.text)
-            llm = ChatOpenAI(
-                model_name="gpt-4-1106-preview",
-                openai_api_key=OPENAI_API_KEY,
-                temperature=0.8,
-                verbose=True
-            )
-            result = llm.predict(prompt)
-
-            if 'true' in result:
-                self.is_new = True
-            elif 'false' in result:
-                self.is_new = False
-            else:
-                self.is_new = True
-
-        print(f'eto is_new {self.is_new}')
-
-        user_id = self.user_message.from_user.id
-
-        if self.is_new:
-            processor = MessageProcessor(self.bot, self.user_message)
-        else:
-            # processor = MessageProcessor.instances.get(user_id)
-            processor = Router.get_processor(user_id)
-            if processor is None:
-                processor = MessageProcessor(self.bot, self.user_message)
-            else:
-                self.old_message = processor.full_message
-                processor.cancel()
-                processor = MessageProcessor(
-                    bot=self.bot,
-                    user_message=self.old_message,
-                    additional_user_message=self.user_message
-                )
-
-        # MessageProcessor.instances[user_id] = processor
-        Router.save_processor(user_id, processor)
-        asyncio.create_task(processor.process())
+﻿aiofiles==23.1.0
+aiogram==2.15
+aiohttp==3.8.6
+aiosignal==1.3.1
+annotated-types==0.6.0
+anyio==3.7.1
+async-timeout==4.0.3
+attrs==23.1.0
+Babel==2.9.1
+certifi==2023.7.22
+charset-normalizer==3.3.0
+click==8.1.7
+colorama==0.4.6
+configure==0.5
+contourpy==1.2.0
+cycler==0.12.1
+dataclasses-json==0.6.1
+dill==0.3.7
+exceptiongroup==1.1.3
+fastapi==0.104.1
+fonttools==4.45.0
+frozenlist==1.4.0
+greenlet==3.0.0
+h11==0.14.0
+idna==3.4
+Jinja2==3.1.2
+jsonpatch==1.33
+jsonpointer==2.4
+kiwisolver==1.4.5
+langchain==0.0.312
+langsmith==0.0.43
+magic-filter==1.0.12
+MarkupSafe==2.1.3
+marshmallow==3.20.1
+matplotlib==3.8.2
+multidict==6.0.4
+mypy-extensions==1.0.0
+numexpr==2.8.7
+numpy==1.26.0
+openai==0.28.1
+packaging==23.2
+pandas==2.1.3
+Pillow==10.1.0
+psycopg2-binary==2.9.9
+pydantic==2.3.0
+pydantic_core==2.6.3
+pyparsing==3.1.1
+pyTelegramBotAPI==4.14.0
+python-dateutil==2.8.2
+python-dotenv==1.0.0
+pytz==2023.3.post1
+PyYAML==6.0.1
+redis==5.0.1
+reportlab==4.0.7
+requests==2.31.0
+six==1.16.0
+sniffio==1.3.0
+SQLAlchemy==2.0.21
+starlette==0.27.0
+tenacity==8.2.3
+tqdm==4.66.1
+typing-inspect==0.9.0
+typing_extensions==4.8.0
+tzdata==2023.3
+urllib3==2.0.6
+uvicorn==0.24.0.post1
+yarl==1.9.2

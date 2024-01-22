@@ -1,78 +1,46 @@
-from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
+import pandas as pd
+import matplotlib.pyplot as plt
 from models import FinancialRecord, Session
-from sqlalchemy import extract, func
-from datetime import datetime, date
-
-app = FastAPI()
-
-templates = Jinja2Templates(directory="templates")
 
 
-@app.get("/record/{user_id}", response_class=HTMLResponse)
-async def read_record_html(request: Request, user_id: int):
-    return templates.TemplateResponse("report.html", {"request": request, "user_id": user_id})
+class PDFGenerator:
+    @staticmethod
+    def generate_pdf_report(user_id):
+        session = Session()
+        financial_records = session.query(FinancialRecord).filter_by(user_id=user_id).all()
 
+        if not financial_records:
+            session.close()
+            return "No financial records found for the specified user."
 
-@app.get("/api/record/sum/{user_id}", response_class=JSONResponse)
-async def get_records_sum(user_id: int):
-    with Session() as session:
-        query = session.query(
-            func.sum(FinancialRecord.amount).label("total_amount"),
-            FinancialRecord.status
-        ).filter_by(user_id=user_id).group_by(FinancialRecord.status).all()
+        data = []
+        for record in financial_records:
+            data.append([record.username, record.user_message, record.product, record.price,
+                         record.quantity, record.status, record.amount, record.timestamp])
 
-    sums_by_status = {status: total_amount for total_amount, status in query}
-    return JSONResponse(content=sums_by_status)
+        df = pd.DataFrame(data, columns=["Username", "User Message", "Product", "Price",
+                                         "Quantity", "Status", "Amount", "Timestamp"])
 
+        pdf_filename = f"financial_report_user_{user_id}.pdf"
 
-@app.get("/api/record/{user_id}", response_class=JSONResponse)
-async def read_record_api(
-    user_id: int,
-    target_date: str = Query(None, description="Целевая дата в формате 'YYYY-MM'"),
-    status: str = Query(None, description="Статус записей (Expenses, Income)"),
-):
-    with Session() as session:
-        query = session.query(FinancialRecord).filter_by(user_id=user_id)
+        fig, ax = plt.subplots(figsize=(10, 6))
 
-        if target_date is not None:
-            target_date = datetime.strptime(target_date, "%Y-%m")
-            target_date = date(target_date.year, target_date.month, 1)
+        ax.axis('off')
 
-            query = query.filter(
-                extract('year', func.to_date(FinancialRecord.timestamp, 'DD-MM-YY HH24:MI')) == target_date.year,
-                extract('month', func.to_date(FinancialRecord.timestamp, 'DD-MM-YY HH24:MI')) == target_date.month
-            )
+        header = ["Username", "User Message", "Product", "Price",
+                  "Quantity", "Status", "Amount", "Timestamp"]
 
-        if status is not None:
-            query = query.filter(FinancialRecord.status.in_([status]))
+        table = ax.table(cellText=[header] + df.values.tolist(),
+                         colLabels=None, cellLoc='center', loc='top', colColours=['#f2f2f2'] * len(header),
+                         cellColours=[['#f2f2f2'] * len(header)] + [['#ffffff'] * len(header) for _ in range(len(df))])
 
-        financial_records = query.all()
+        table.auto_set_font_size(False)
+        table.set_fontsize(5)
+        table.scale(1, 1.5)
 
-    if not financial_records:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Для пользователя {user_id} не найдено финансовых записей за {target_date.year}-{target_date.month}"
-        )
+        plt.savefig(pdf_filename, format='pdf', bbox_inches='tight')
 
-    records_json = [
-        {
-            "username": record.username,
-            "user_message": record.user_message,
-            "product": record.product,
-            "price": record.price,
-            "quantity": record.quantity,
-            "status": record.status,
-            "amount": record.amount,
-            "timestamp": record.timestamp,
-        }
-        for record in financial_records
-    ]
+        plt.close()
 
-    return JSONResponse(content=records_json)
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+        session.close()
+        return pdf_filename
