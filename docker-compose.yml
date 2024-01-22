@@ -1,47 +1,37 @@
-version: '3'
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import datetime
+from dotenv import load_dotenv
+import os
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
-services:
+load_dotenv()
 
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-  report:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    depends_on:
-      - postgres
-    volumes:
-      - .:/usr/src/app
-    command: bash -c "wait-for-it postgres:5432 -- uvicorn report_fastapi:app --host 0.0.0.0 --port 8000"
+Base = declarative_base()
 
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    env_file:
-      - .env.docker
-    depends_on:
-      - postgres
-      - redis
-    volumes:
-      - .:/usr/src/app
-    command: bash -c "wait-for-it postgres:5432 -- python app.py"
 
-  postgres:
-    image: postgres:16.1
-    environment:
-      POSTGRES_DB: financial_records
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - app_db:/var/lib/postgresql/data
+class FinancialRecord(Base):
+    __tablename__ = 'financial_records'
 
-volumes:
-  app_db:
+    message_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
+    user_id = Column(Integer)
+    username = Column(String)
+    user_message = Column(String)
+    product = Column(String)
+    price = Column(Integer)
+    quantity = Column(Integer)
+    status = Column(String)
+    amount = Column(Integer)
+    timestamp = Column(String, default=lambda: (
+            datetime.datetime.utcnow() + datetime.timedelta(hours=6)
+    ).strftime('%d-%m-%y %H:%M'))
+
+
+engine = create_engine(DATABASE_URL, echo=True)
+Base.metadata.create_all(bind=engine)
+
+Session = sessionmaker(bind=engine)

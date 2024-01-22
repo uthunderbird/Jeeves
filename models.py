@@ -1,37 +1,45 @@
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import datetime
-from dotenv import load_dotenv
-import os
-from sqlalchemy.dialects.postgresql import UUID
-import uuid
+import pandas as pd
+import matplotlib.pyplot as plt
+from models import FinancialRecord, Session
 
-load_dotenv()
+class PDFGenerator:
+    @staticmethod
+    def generate_pdf_report(user_id):
+        session = Session()
+        financial_records = session.query(FinancialRecord).filter_by(user_id=user_id).all()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+        if not financial_records:
+            session.close()
+            return "No financial records found for the specified user."
 
-Base = declarative_base()
+        data = []
+        for record in financial_records:
+            data.append([record.username, record.user_message, record.product, record.price,
+                         record.quantity, record.status, record.amount, record.timestamp])
 
+        df = pd.DataFrame(data, columns=["Username", "User Message", "Product", "Price",
+                                         "Quantity", "Status", "Amount", "Timestamp"])
 
-class FinancialRecord(Base):
-    __tablename__ = 'financial_records'
+        pdf_filename = f"financial_report_user_{user_id}.pdf"
 
-    message_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
-    user_id = Column(Integer)
-    username = Column(String)
-    user_message = Column(String)
-    product = Column(String)
-    price = Column(Integer)
-    quantity = Column(Integer)
-    status = Column(String)
-    amount = Column(Integer)
-    timestamp = Column(String, default=lambda: (
-            datetime.datetime.utcnow() + datetime.timedelta(hours=6)
-    ).strftime('%d-%m-%y %H:%M'))
+        fig, ax = plt.subplots(figsize=(10, 6))
 
+        ax.axis('off')
 
-engine = create_engine(DATABASE_URL, echo=True)
-Base.metadata.create_all(bind=engine)
+        header = ["Username", "User Message", "Product", "Price",
+                  "Quantity", "Status", "Amount", "Timestamp"]
+        
+        table = ax.table(cellText=[header] + df.values.tolist(),
+                         colLabels=None, cellLoc='center', loc='top', colColours=['#f2f2f2']*len(header),
+                         cellColours=[['#f2f2f2']*len(header)] + [['#ffffff']*len(header) for _ in range(len(df))])
 
-Session = sessionmaker(bind=engine)
+        table.auto_set_font_size(False)
+        table.set_fontsize(5)
+        table.scale(1, 1.5)
+
+        plt.savefig(pdf_filename, format='pdf', bbox_inches='tight')
+
+        plt.close()
+
+        session.close()
+        return pdf_filename
