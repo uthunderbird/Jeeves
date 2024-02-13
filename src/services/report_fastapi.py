@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from models.models import FinancialRecord, Session
+from budget.models.models import Transaction, Session
 from sqlalchemy import extract, func
 from datetime import datetime, date
 
@@ -19,9 +19,9 @@ async def read_record_html(request: Request, user_id: int):
 async def get_records_sum(user_id: int):
     with Session() as session:
         query = session.query(
-            func.sum(FinancialRecord.amount).label("total_amount"),
-            FinancialRecord.status
-        ).filter_by(user_id=user_id).group_by(FinancialRecord.status).all()
+            func.sum(Transaction.amount).label("total_amount"),
+            Transaction.status
+        ).filter_by(user_id=user_id).group_by(Transaction.status).all()
 
     sums_by_status = {status: total_amount for total_amount, status in query}
     return JSONResponse(content=sums_by_status)
@@ -34,19 +34,19 @@ async def read_record_api(
     status: str = Query(None, description="Статус записей (Expenses, Income)"),
 ):
     with Session() as session:
-        query = session.query(FinancialRecord).filter_by(user_id=user_id)
+        query = session.query(Transaction).filter_by(user_id=user_id)
 
         if target_date is not None:
             target_date = datetime.strptime(target_date, "%Y-%m")
             target_date = date(target_date.year, target_date.month, 1)
 
             query = query.filter(
-                extract('year', func.to_date(FinancialRecord.timestamp, 'DD-MM-YY HH24:MI')) == target_date.year,
-                extract('month', func.to_date(FinancialRecord.timestamp, 'DD-MM-YY HH24:MI')) == target_date.month
+                extract('year', func.to_date(Transaction.timestamp, 'DD-MM-YY HH24:MI')) == target_date.year,
+                extract('month', func.to_date(Transaction.timestamp, 'DD-MM-YY HH24:MI')) == target_date.month
             )
 
         if status is not None:
-            query = query.filter(FinancialRecord.status.in_([status]))
+            query = query.filter(Transaction.status.in_([status]))
 
         financial_records = query.all()
 

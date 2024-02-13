@@ -1,13 +1,13 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-from models.models import FinancialRecord, Session
+from budget.models.models import Transaction, Session
 
 
 class PDFGenerator:
     @staticmethod
     def generate_pdf_report(user_id):
         session = Session()
-        financial_records = session.query(FinancialRecord).filter_by(user_id=user_id).all()
+        financial_records = session.query(Transaction).filter_by(user_id=user_id).all()
 
         if not financial_records:
             session.close()

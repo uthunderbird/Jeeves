@@ -14,7 +14,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 Base = declarative_base()
 
 
-class FinancialRecord(Base):
+class Transaction(Base):
     __tablename__ = 'financial_records'
 
     message_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)

@@ -4,7 +4,7 @@ import telebot.async_telebot
 from dotenv import load_dotenv
 from app_class import SendWelcome
 from routerV2 import Router
-from reports.pdf_generator import PDFGenerator
+from budget.reports import PDFGenerator
 
 
 load_dotenv()

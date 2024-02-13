@@ -8,17 +8,17 @@ import asyncio
 
 import telebot.async_telebot
 import os
-import json
 from langchain.callbacks.base import AsyncCallbackHandler
 from langchain.callbacks.human import HumanRejectedException
-from models.models import Session, FinancialRecord
+from budget.models.models import Session, Transaction
 from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.tools import StructuredTool
 from pydantic.v1 import BaseModel, Field
 from telebot import types
-from langchain.prompts import PromptTemplate
 from langchain.agents import load_tools, initialize_agent, AgentType
+
+from workers.chains.transaction_structurer import make_chain as make_structurer_chain
 
 load_dotenv()
 
@@ -64,16 +64,8 @@ class HumanApprovalCallbackHandler(AsyncCallbackHandler):
 class MessageProcessor:
     instances = {}
 
-    class SaveRecordSchema(BaseModel):
-        product: str = Field(description='entity')
-        price: int = Field(description='price')
-        quantity: int = Field(description='quantity')
-        status: str = Field(description='status')
-        amount: int = Field(description='amount')
-
     class CreateRecordSchema(BaseModel):
         user_message_text: str = Field(description='user original message text and additional message text')
-        print(f'ETO SCHEMA {user_message_text}')
 
     def __init__(self, bot, user_message, additional_user_message: telebot.types.Message | None = None):
         self.spaced_text = '; '
@@ -124,8 +116,10 @@ class MessageProcessor:
 
         tools = load_tools(['llm-math'], llm=llm)
 
-        callbacks = [HumanApprovalCallbackHandler(should_check=self._should_check,
-                                                  approve=self._approve)]
+        callbacks = [HumanApprovalCallbackHandler(
+            should_check=self._should_check,
+            approve=self._approve
+        )]
 
         agent = initialize_agent(
             tools + [
@@ -141,25 +135,32 @@ class MessageProcessor:
                     description="""Useful to save structured dict record into JSON file""",
                     args_schema=self.SaveRecordSchema,
                 ),
-        ], llm,
+            ], llm,
             agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
             verbose=True
         )
 
         result = await agent.arun(
-            'System: Когда ты общаешься с пользователем, представь, что ты - надежный финансовый помощник в их мире. Ты оборудован '
+            'System: Когда ты общаешься с пользователем, представь, что ты - надежный финансовый помощник в их мире. '
+            'Ты оборудован '
             'различными тулсами (инструментами), которые помогут пользователю эффективно управлять своими финансами.'
             'Один из твоих ключевых инструментов - это функция, которая вытаскивает из сообщений пользователя важные '
-            'сущности, такие как названия товаров, количество, цены и общие суммы. Когда пользователь делится информацией '
+            'сущности, такие как названия товаров, количество, цены и общие суммы. Когда пользователь делится '
+            'информацией '
             'о своих финансовых операциях, ты можешь использовать этот тулс, чтобы автоматически распознавать и '
-            'анализировать эти детали. Например, если пользователь сообщает "Купил 2 билета в кино по 300 рублей каждый", '
+            'анализировать эти детали. Например, если пользователь сообщает "Купил 2 билета в кино по 300 рублей '
+            'каждый", '
             'ты можешь извлечь информацию о количестве (2 билета), цена за билет (300 рублей) и общей сумме покупки.'
-            'Ты также обладаешь знаниями о финансовых темах и можешь предоставлять пользователю советы по бюджетированию, '
+            'Ты также обладаешь знаниями о финансовых темах и можешь предоставлять пользователю советы по '
+            'бюджетированию, '
             'инвестированию, управлению долгами и многим другим аспектам финансов. Твоя цель - помогать пользователю '
-            'сделать осознанные решения, связанные с их финансами, и обеспечивать им поддержку в финансовом планировании '
+            'сделать осознанные решения, связанные с их финансами, и обеспечивать им поддержку в финансовом '
+            'планировании '
             'и учете операций.'
-            'Не забывай использовать свои инструменты максимально эффективно, чтобы сделать опыт пользователя с финансами '
-            'более простым и удобным. Чем точнее и полнее ты сможешь обрабатывать информацию, тем лучше ты сможешь помочь '
+            'Не забывай использовать свои инструменты максимально эффективно, чтобы сделать опыт пользователя с '
+            'финансами '
+            'более простым и удобным. Чем точнее и полнее ты сможешь обрабатывать информацию, тем лучше ты сможешь '
+            'помочь '
             f'пользователю в их финансовых запросах.'
             f'User: {self.text}',
             callbacks=callbacks
@@ -170,39 +171,9 @@ class MessageProcessor:
     def create_record(self, *args, **kwargs):
         """Useful to transform raw string about financial operations into structured JSON"""
 
-        prompt_template = PromptTemplate.from_template("""system" "Hello, in the end of this prompt you will get a message,
-             "it's going contain text about user's budget. "
-             "You should identify 4 parameters in this text: "
-             "first is entity (product or service if it's about spending money) "
-             "or source if it's about gaining money, "
-             "second is the quantity of products, "
-             "third is the amount of money gained or spent on this product, "
-             "fourth is status gained/spent. "
-             "Your answer should be like this: "
-             "Product: (here should be the product or service you identified from the message "
-             "or source of money if it was gained) "
-             "Quantity: (here should be quantity of products or if there is no quantity "
-             "you should fill 1 in here) "
-             "Price: here should be unit price of a product or service of money mentioned in the message, but "
-             "don't mention the currency, only number, it's possible that there will "
-             "be slang expressions like 'k' referring to number a thousand, keep it in "
-             "mind and save it as a number. For example if there is '2k' or  '2к' it "
-             "means that you should write 2000 "
-             "Status: (here should be status you got from the message, whether it was"
-             "spent or gained, if spent - write 'Expenses', if gained - write 'Income' "
-             "Amount: (there should be a sum here, the sum is equal to the quantity multiplied by the price),
-             "you should always call create_record tool and then save_record tool even if you are not sure about
-             values in all fields"
-             'user message - {text}'""")
-
-        prompt = prompt_template.format(text=self.text)
-        llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.8)
-        record = llm.predict(prompt)
-
-        self.record = record
-        record_dict = json.dumps(record)
-        self.record = record_dict
-        return record_dict
+        model = ChatOpenAI(model="gpt-4-turbo-preview")
+        chain = make_structurer_chain(model)
+        return chain.invoke({'message': self.text}).model_dump()
 
     def save_record(self, callable_: functools.partial | None = None, **data_dict):
 
@@ -211,16 +182,16 @@ class MessageProcessor:
 
         session = Session()
 
-        financial_record = FinancialRecord(
-                user_id=self.full_message.from_user.id,
-                username=self.full_message.from_user.username,
-                user_message=self.full_message.text,
-                product=data_dict.get("product"),
-                price=data_dict.get("price"),
-                quantity=data_dict.get("quantity"),
-                status=data_dict.get("status"),
-                amount=data_dict.get("amount")
-            )
+        financial_record = Transaction(
+            user_id=self.full_message.from_user.id,
+            username=self.full_message.from_user.username,
+            user_message=self.full_message.text,
+            product=data_dict.get("product"),
+            price=data_dict.get("price"),
+            quantity=data_dict.get("quantity"),
+            status=data_dict.get("status"),
+            amount=data_dict.get("amount")
+        )
 
         session.add(financial_record)
         session.commit()
@@ -254,9 +225,11 @@ class MessageProcessor:
             await self.bot.delete_message(call.message.chat.id, call.message.message_id)
             self.answerCall = True
         elif call.data == 'no':
-            await self.bot.edit_message_reply_markup(chat_id=call.message.chat.id,
-                                                     message_id=call.message.message_id,
-                                                     reply_markup=None)
+            await self.bot.edit_message_reply_markup(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=None
+            )
             await self.bot.delete_message(call.message.chat.id, call.message.message_id)
             self.answerCall = False
         self._answer_recieved.set()
