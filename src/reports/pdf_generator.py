@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-from models import FinancialRecord, Session
+from models.models import FinancialRecord, Session
 
 
 class PDFGenerator:

@@ -1,14 +1,14 @@
-﻿FROM python:3.10-slim
+﻿FROM python:3.10-alpine
 
-
-RUN apt update && apt install -y gcc wait-for-it
-
+RUN apk add --no-cache gcc musl-dev libffi-dev
 
 WORKDIR /usr/src/app
 
-COPY reqs.txt ./reqs.txt
+ENV PYTHONPATH="src:${PYTHONPATH}"
 
-RUN pip3 install --upgrade pip --default-timeout=100 && pip3 install -r reqs.txt --default-timeout=100
+COPY requirements.txt ./requirements.txt
 
+RUN pip3 install --upgrade pip --default-timeout=100 && \
+    pip3 install --no-cache-dir -r requirements.txt --default-timeout=100
 
 COPY . .

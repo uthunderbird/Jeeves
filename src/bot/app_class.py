@@ -11,7 +11,7 @@ import os
 import json
 from langchain.callbacks.base import AsyncCallbackHandler
 from langchain.callbacks.human import HumanRejectedException
-from models import Session, FinancialRecord
+from models.models import Session, FinancialRecord
 from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.tools import StructuredTool

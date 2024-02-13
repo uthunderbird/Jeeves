@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from models import FinancialRecord, Session
+from models.models import FinancialRecord, Session
 from sqlalchemy import extract, func
 from datetime import datetime, date
 

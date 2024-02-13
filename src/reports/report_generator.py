@@ -2,7 +2,7 @@
 
 
 def generate_html_report(financial_records):
-    with open("templates/report.html", "r") as template_file:
+    with open("../templates/report.html", "r") as template_file:
         template_content = template_file.read()
 
     template = Template(template_content)

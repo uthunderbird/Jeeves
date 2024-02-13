@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
-from app_class import MessageProcessor
+from bot.app_class import MessageProcessor
 
 import redis
 import dill as pickle
@@ -11,11 +11,11 @@ import dill as pickle
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_URL = os.getenv("REDIS_HOST")
 
 
 class Router:
-    redis_client = redis.StrictRedis(host=REDIS_HOST, port=6379, db=0)
+    redis_client = redis.from_url(url=REDIS_URL)
 
     def __init__(self, bot, user_message):
         self.bot = bot
